@@ -99,6 +99,10 @@ void drawMessageSection();
 void drawTimeSection();
 void drawWeatherSection();
 void drawSectionBorders();
+void networkTask(void *parameter);
+
+// FreeRTOS task handle for network operations
+TaskHandle_t networkTaskHandle = NULL;
 
 // ==================== SETUP ====================
 void setup()
@@ -172,62 +176,91 @@ void setup()
   // Setup MQTT
   setupMQTT();
 
+  // Create network task on Core 0 (display runs on Core 1)
+  xTaskCreatePinnedToCore(
+      networkTask,        // Task function
+      "NetworkTask",      // Task name
+      8192,               // Stack size
+      NULL,               // Parameters
+      1,                  // Priority
+      &networkTaskHandle, // Task handle
+      0                   // Run on Core 0
+  );
+
   Serial.println("System ready!");
 }
 
-// ==================== MAIN LOOP ====================
-void loop()
+// ==================== NETWORK TASK (runs on Core 0) ====================
+void networkTask(void *parameter)
 {
-  static unsigned long lastWiFiCheck = 0;
-  static unsigned long lastWiFiRetry = 0;
-  static int wifiRetryCount = 0;
+  unsigned long lastWiFiCheck = 0;
+  unsigned long lastWiFiRetry = 0;
+  int wifiRetryCount = 0;
+  bool wifiReconnecting = false;
 
-  // Check WiFi status every 5 seconds
-  if (millis() - lastWiFiCheck >= 5000)
+  for (;;) // Infinite loop
   {
-    lastWiFiCheck = millis();
-
-    if (WiFi.status() != WL_CONNECTED)
+    // Check WiFi status every 5 seconds
+    if (millis() - lastWiFiCheck >= 5000)
     {
-      Serial.println("WiFi disconnected!");
-      wifiRetryCount++;
+      lastWiFiCheck = millis();
 
-      // Retry WiFi connection every 10 seconds
-      if (millis() - lastWiFiRetry >= 10000 || lastWiFiRetry == 0)
+      if (WiFi.status() != WL_CONNECTED && !wifiReconnecting)
       {
-        lastWiFiRetry = millis();
-        Serial.print("WiFi retry attempt #");
-        Serial.println(wifiRetryCount);
+        Serial.println("WiFi disconnected!");
+        wifiRetryCount++;
 
-        // After 5 failed attempts, do a full reset
-        if (wifiRetryCount > 5)
+        if (millis() - lastWiFiRetry >= 10000 || lastWiFiRetry == 0)
         {
-          Serial.println("Multiple WiFi failures - full reset...");
-          WiFi.disconnect(true, true);
-          delay(1000);
-          wifiRetryCount = 0;
-        }
+          lastWiFiRetry = millis();
+          Serial.print("WiFi retry attempt #");
+          Serial.println(wifiRetryCount);
 
-        setupWiFi();
+          if (wifiRetryCount > 5)
+          {
+            Serial.println("Multiple WiFi failures - full reset...");
+            WiFi.disconnect(true, true);
+            wifiRetryCount = 0;
+          }
+
+          wifiReconnecting = true;
+          WiFi.begin(ssid, password);
+        }
+      }
+      else if (WiFi.status() == WL_CONNECTED)
+      {
+        if (wifiReconnecting)
+        {
+          Serial.println("WiFi reconnected!");
+          Serial.print("IP: ");
+          Serial.println(WiFi.localIP());
+        }
+        wifiRetryCount = 0;
+        wifiReconnecting = false;
       }
     }
-    else
-    {
-      wifiRetryCount = 0; // Reset counter on successful connection
-    }
-  }
 
-  // Maintain MQTT connection (only if WiFi is connected)
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    if (!mqttClient.connected())
+    // MQTT connection (only if WiFi is connected)
+    if (WiFi.status() == WL_CONNECTED)
     {
-      reconnectMQTT();
+      if (!mqttClient.connected())
+      {
+        reconnectMQTT();
+      }
+      else
+      {
+        mqttClient.loop();
+      }
     }
-    mqttClient.loop();
-  }
 
-  // Update display every 100ms
+    vTaskDelay(10 / portTICK_PERIOD_MS); // Small delay to prevent watchdog
+  }
+}
+
+// ==================== MAIN LOOP (runs on Core 1 - display only) ====================
+void loop()
+{
+  // Update display every 100ms - this loop is dedicated to display only
   static unsigned long lastUpdate = 0;
   if (millis() - lastUpdate >= 100)
   {
@@ -310,6 +343,7 @@ void setupMQTT()
   mqttClient.setServer(mqtt_server, mqtt_port);
   mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(512);
+  mqttClient.setSocketTimeout(1); // 1 second max for all socket operations
 }
 
 void reconnectMQTT()
@@ -320,10 +354,10 @@ void reconnectMQTT()
   // Check WiFi first
   if (WiFi.status() != WL_CONNECTED)
   {
-    Serial.println("WiFi not connected, skipping MQTT...");
-    return;
+    return; // Silent return - don't block
   }
 
+  // Non-blocking: only attempt every 5 seconds
   if (millis() - lastAttempt < 5000)
     return;
   lastAttempt = millis();
@@ -333,18 +367,15 @@ void reconnectMQTT()
   Serial.print(mqttRetryCount);
   Serial.print(")...");
 
-  // Disconnect and reset if needed
-  mqttClient.disconnect();
-  delay(100);
-
   // Reinitialize MQTT client after multiple failures
   if (mqttRetryCount > 5)
   {
     Serial.println("\nReinitializing MQTT client...");
+    mqttClient.disconnect();
     mqttClient.setServer(mqtt_server, mqtt_port);
     mqttClient.setCallback(mqttCallback);
+    mqttClient.setSocketTimeout(1);
     mqttRetryCount = 0;
-    delay(500);
   }
 
   if (mqttClient.connect(mqtt_client_id))
@@ -599,7 +630,8 @@ void drawTimeSection()
   // Section 2: Time & Date (rows 11-20)
   struct tm timeinfo;
 
-  if (getLocalTime(&timeinfo))
+  // Use 0ms timeout to prevent blocking - just use cached time
+  if (getLocalTime(&timeinfo, 0))
   {
     char timeStr[9];
     char dateStr[12];

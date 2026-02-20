@@ -1,0 +1,982 @@
+/*
+ * ESP32-S3 Mini HUB75 64x32 RGB LED Matrix Display with MQTT Control
+ *
+ * Display Layout (64x32 pixels):
+ * ┌────────────────────────────────────────────────────────────────┐
+ * │  Custom Message (rows 0-9)                                     │
+ * ├────────────────────────────────────────────────────────────────┤
+ * │  Time & Date (rows 10-20)                                      │
+ * ├────────────────────────────────────────────────────────────────┤
+ * │  Weather Info (rows 21-31)                                     │
+ * └────────────────────────────────────────────────────────────────┘
+ *
+ * Wiring:
+ * R1->GPIO2, G1->GPIO3, B1->GPIO4, R2->GPIO5, G2->GPIO6, B2->GPIO7
+ * A->GPIO16, B->GPIO17, C->GPIO18, D->GPIO8, E->GPIO15
+ * CLK->GPIO9, LAT->GPIO10, OE->GPIO11
+ */
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
+#include <time.h>
+#include <WebServer.h>
+#include "AudioFileSourceHTTPStream.h"
+#include "AudioFileSourceBuffer.h"
+#include "AudioGeneratorWAV.h"
+#include "AudioOutputI2S.h"
+
+// ==================== CONFIGURATION ====================
+// WiFi Settings - UPDATE THESE!
+const char *ssid = "Thread_Repair 4G";
+const char *password = "Kuldip@123";
+
+// MQTT Settings - UPDATE BROKER IP!
+const char *mqtt_server = "192.168.1.4"; // Your PC's IP address
+const int mqtt_port = 1883;
+const char *mqtt_client_id = "ESP32_HUB75_Display";
+
+// MQTT Topics
+const char *topic_brightness = "display/brightness";
+const char *topic_message = "display/message";
+const char *topic_weather = "display/weather";
+const char *topic_status = "display/status";
+const char *topic_color = "display/color";
+const char *topic_speed = "display/speed";
+const char *topic_restart = "display/restart";
+const char *topic_announce = "display/announce"; // Audio announcement
+
+// NTP Settings
+const char *ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 19800; // GMT+5:30 for India (adjust for your timezone)
+const int daylightOffset_sec = 0;
+
+// ==================== PIN CONFIGURATION ====================
+#define R1_PIN 2
+#define G1_PIN 3
+#define B1_PIN 4
+#define R2_PIN 5
+#define G2_PIN 6
+#define B2_PIN 7
+#define A_PIN 16
+#define B_PIN 17
+#define C_PIN 18
+#define D_PIN 8
+#define E_PIN 15
+#define LAT_PIN 10
+#define OE_PIN 11
+#define CLK_PIN 9
+
+// Panel configuration
+#define PANEL_RES_X 64
+#define PANEL_RES_Y 32
+#define PANEL_CHAIN 1
+
+// MAX98357A I2S Audio Pins
+#define I2S_DOUT 40 // DIN on MAX98357A
+#define I2S_BCLK 42 // BCLK on MAX98357A
+#define I2S_LRC 41  // LRC on MAX98357A
+#define I2S_SD 21   // SD (Shutdown) pin - HIGH=enabled, LOW=shutdown
+
+// ==================== GLOBAL OBJECTS ====================
+MatrixPanel_I2S_DMA *dma_display = nullptr;
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
+// Audio objects
+AudioGeneratorWAV *wav = nullptr;
+AudioFileSourceHTTPStream *audioSource = nullptr;
+AudioFileSourceBuffer *audioBuff = nullptr;
+AudioOutputI2S *audioOut = nullptr;
+WebServer httpServer(80);
+bool isPlaying = false;
+
+// ==================== DISPLAY STATE ====================
+uint8_t currentBrightness = 90;
+String customMessage = "Hello!";
+String weatherTemp = "..";
+String weatherDesc = "Wait";
+String weatherCity = "";
+uint8_t scrollSpeed = 150; // Scroll delay in ms (lower = faster)
+
+// Colors
+uint16_t colorWhite, colorRed, colorGreen, colorBlue, colorYellow, colorCyan, colorOrange;
+
+// User-customizable colors for each section
+uint16_t userColorMessage;     // Section 1: Message
+uint16_t userColorTime;        // Section 2: Time
+uint16_t userColorWeather;     // Section 3: Weather temp
+uint16_t userColorWeatherDesc; // Section 3: Weather description
+
+// ==================== FUNCTION DECLARATIONS ====================
+void setupWiFi();
+void setupMQTT();
+void mqttCallback(char *topic, byte *payload, unsigned int length);
+void reconnectMQTT();
+void updateDisplay();
+void drawMessageSection();
+void drawTimeSection();
+void drawWeatherSection();
+void drawSectionBorders();
+void networkTask(void *parameter);
+void setupAudio();
+void playAudioFromURL(String url);
+void handleAudioUpload();
+void stopAudio();
+
+// FreeRTOS task handle for network operations
+TaskHandle_t networkTaskHandle = NULL;
+
+// ==================== AUDIO FUNCTIONS ====================
+#include "driver/i2s.h"
+
+void playTestBeep()
+{
+  Serial.println("Playing test beep...");
+
+  // Configure I2S for test beep
+  i2s_config_t i2s_config = {
+      .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
+      .sample_rate = 44100,
+      .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+      .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+      .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+      .dma_buf_count = 8,
+      .dma_buf_len = 64,
+      .use_apll = false,
+      .tx_desc_auto_clear = true};
+
+  i2s_pin_config_t pin_config = {
+      .bck_io_num = I2S_BCLK,
+      .ws_io_num = I2S_LRC,
+      .data_out_num = I2S_DOUT,
+      .data_in_num = I2S_PIN_NO_CHANGE};
+
+  // Install I2S driver on port 0 (same as standalone test that worked)
+  esp_err_t result = i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+  if (result != ESP_OK)
+  {
+    Serial.printf("I2S driver install failed: %d\n", result);
+    return;
+  }
+
+  result = i2s_set_pin(I2S_NUM_0, &pin_config);
+  if (result != ESP_OK)
+  {
+    Serial.printf("I2S set pin failed: %d\n", result);
+    i2s_driver_uninstall(I2S_NUM_0);
+    return;
+  }
+
+  // Generate beep tone (1kHz)
+  const int sample_rate = 44100;
+  const int freq = 1000;
+  const int duration_ms = 200;
+  const int samples = sample_rate * duration_ms / 1000;
+
+  int16_t *samples_data = (int16_t *)malloc(samples * 4);
+  if (!samples_data)
+  {
+    Serial.println("Failed to allocate sample buffer");
+    i2s_driver_uninstall(I2S_NUM_0);
+    return;
+  }
+
+  for (int i = 0; i < samples; i++)
+  {
+    float t = (float)i / sample_rate;
+    int16_t sample = (int16_t)(16000 * sin(2.0 * M_PI * freq * t));
+    samples_data[i * 2] = sample;     // Left
+    samples_data[i * 2 + 1] = sample; // Right
+  }
+
+  size_t bytes_written;
+  i2s_write(I2S_NUM_0, samples_data, samples * 4, &bytes_written, portMAX_DELAY);
+
+  free(samples_data);
+  delay(100);
+  i2s_driver_uninstall(I2S_NUM_0);
+  Serial.println("Test beep done!");
+}
+
+void setupAudio()
+{
+  Serial.println("Initializing audio...");
+
+  // Configure SD pin for amplifier control
+  pinMode(I2S_SD, OUTPUT);
+  digitalWrite(I2S_SD, HIGH); // Enable amplifier
+  Serial.println("Amplifier enabled (SD=HIGH)");
+
+  // Play a test beep to verify audio hardware works
+  playTestBeep();
+
+  // Initialize I2S audio output on port 0
+  audioOut = new AudioOutputI2S(0, AudioOutputI2S::EXTERNAL_I2S);
+  audioOut->SetPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
+  audioOut->SetGain(1.0); // Volume: 0.0 to 1.0 (MAX volume for testing)
+
+  Serial.println("Audio initialized on I2S port 0!");
+}
+
+void stopAudio()
+{
+  if (wav != nullptr && wav->isRunning())
+  {
+    wav->stop();
+    Serial.println("Audio stopped");
+  }
+
+  if (audioBuff != nullptr)
+  {
+    delete audioBuff;
+    audioBuff = nullptr;
+  }
+
+  if (audioSource != nullptr)
+  {
+    delete audioSource;
+    audioSource = nullptr;
+  }
+
+  if (wav != nullptr)
+  {
+    delete wav;
+    wav = nullptr;
+  }
+
+  isPlaying = false;
+}
+
+void playAudioFromURL(String url)
+{
+  Serial.println("=== AUDIO PLAYBACK START ===");
+  Serial.print("Playing audio from: ");
+  Serial.println(url);
+
+  // Ensure SD pin is HIGH
+  digitalWrite(I2S_SD, HIGH);
+  Serial.println("Amplifier SD pin: HIGH");
+
+  // Show announcement on display
+  dma_display->fillRect(0, 0, 64, 10, 0);
+  dma_display->setCursor(2, 1);
+  dma_display->setTextColor(colorYellow);
+  dma_display->print("Speaker");
+
+  Serial.println("Creating audio source...");
+  // Create new audio source
+  audioSource = new AudioFileSourceHTTPStream(url.c_str());
+  if (!audioSource)
+  {
+    Serial.println("✗ Failed to create audio source!");
+    return;
+  }
+  Serial.println("✓ Audio source created");
+
+  Serial.println("Creating buffer...");
+  // Create buffer
+  audioBuff = new AudioFileSourceBuffer(audioSource, 2048);
+  if (!audioBuff)
+  {
+    Serial.println("✗ Failed to create buffer!");
+    delete audioSource;
+    audioSource = nullptr;
+    return;
+  }
+  Serial.println("✓ Buffer created");
+
+  Serial.println("Creating WAV decoder...");
+  // Create WAV decoder
+  wav = new AudioGeneratorWAV();
+  if (!wav)
+  {
+    Serial.println("✗ Failed to create WAV decoder!");
+    delete audioBuff;
+    delete audioSource;
+    audioBuff = nullptr;
+    audioSource = nullptr;
+    return;
+  }
+  Serial.println("✓ WAV decoder created");
+
+  Serial.println("Starting WAV playback...");
+  // Start playback
+  if (!wav->begin(audioBuff, audioOut))
+  {
+    Serial.println("✗ Failed to start WAV playback!");
+    delete wav;
+    delete audioBuff;
+    delete audioSource;
+    wav = nullptr;
+    audioBuff = nullptr;
+    audioSource = nullptr;
+    return;
+  }
+  Serial.println("✓ WAV playback started!");
+
+  isPlaying = true;
+  Serial.println("Audio playback started!");
+}
+
+void handleAudioLoop()
+{
+  if (isPlaying && wav != nullptr)
+  {
+    if (wav->isRunning())
+    {
+      if (!wav->loop())
+      {
+        // Audio finished or error
+        Serial.println("Audio playback finished");
+        stopAudio();
+      }
+    }
+    else
+    {
+      stopAudio();
+    }
+  }
+}
+
+// ==================== SETUP ====================
+void setup()
+{
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n========================================");
+  Serial.println("ESP32-S3 HUB75 Display with MQTT Control");
+  Serial.println("========================================");
+
+  // Configure HUB75 panel
+  HUB75_I2S_CFG mxconfig(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN);
+  mxconfig.gpio.r1 = R1_PIN;
+  mxconfig.gpio.g1 = G1_PIN;
+  mxconfig.gpio.b1 = B1_PIN;
+  mxconfig.gpio.r2 = R2_PIN;
+  mxconfig.gpio.g2 = G2_PIN;
+  mxconfig.gpio.b2 = B2_PIN;
+  mxconfig.gpio.a = A_PIN;
+  mxconfig.gpio.b = B_PIN;
+  mxconfig.gpio.c = C_PIN;
+  mxconfig.gpio.d = D_PIN;
+  mxconfig.gpio.e = E_PIN;
+  mxconfig.gpio.lat = LAT_PIN;
+  mxconfig.gpio.oe = OE_PIN;
+  mxconfig.gpio.clk = CLK_PIN;
+
+  // Create display object
+  dma_display = new MatrixPanel_I2S_DMA(mxconfig);
+
+  if (!dma_display->begin())
+  {
+    Serial.println("Display initialization failed!");
+    while (1)
+      ;
+  }
+
+  // Initialize colors
+  colorWhite = dma_display->color565(255, 255, 255);
+  colorRed = dma_display->color565(255, 0, 0);
+  colorGreen = dma_display->color565(0, 255, 0);
+  colorBlue = dma_display->color565(0, 100, 255);
+  colorYellow = dma_display->color565(255, 255, 0);
+  colorCyan = dma_display->color565(0, 255, 255);
+  colorOrange = dma_display->color565(255, 165, 0);
+
+  // Initialize user-customizable colors with defaults
+  userColorMessage = colorGreen;      // Green for messages
+  userColorTime = colorCyan;          // Cyan for time
+  userColorWeather = colorOrange;     // Orange for temperature
+  userColorWeatherDesc = colorYellow; // Yellow for weather description
+
+  dma_display->setBrightness8(currentBrightness);
+  dma_display->clearScreen();
+
+  // Show startup message
+  dma_display->setTextSize(1);
+  dma_display->setTextColor(colorCyan);
+  dma_display->setCursor(4, 12);
+  dma_display->print("Connecting...");
+
+  Serial.println("Display initialized!");
+
+  // Connect to WiFi
+  setupWiFi();
+
+  // Configure NTP
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  Serial.println("NTP configured");
+
+  // Setup MQTT
+  setupMQTT();
+
+  // Setup audio
+  setupAudio();
+
+  // Create network task on Core 0 (display runs on Core 1)
+  xTaskCreatePinnedToCore(
+      networkTask,        // Task function
+      "NetworkTask",      // Task name
+      8192,               // Stack size
+      NULL,               // Parameters
+      1,                  // Priority
+      &networkTaskHandle, // Task handle
+      0                   // Run on Core 0
+  );
+
+  Serial.println("System ready!");
+}
+
+// ==================== NETWORK TASK (runs on Core 0) ====================
+void networkTask(void *parameter)
+{
+  unsigned long lastWiFiCheck = 0;
+  unsigned long lastWiFiRetry = 0;
+  int wifiRetryCount = 0;
+  bool wifiReconnecting = false;
+
+  for (;;) // Infinite loop
+  {
+    // Check WiFi status every 5 seconds
+    if (millis() - lastWiFiCheck >= 5000)
+    {
+      lastWiFiCheck = millis();
+
+      if (WiFi.status() != WL_CONNECTED && !wifiReconnecting)
+      {
+        Serial.println("WiFi disconnected!");
+        wifiRetryCount++;
+
+        if (millis() - lastWiFiRetry >= 10000 || lastWiFiRetry == 0)
+        {
+          lastWiFiRetry = millis();
+          Serial.print("WiFi retry attempt #");
+          Serial.println(wifiRetryCount);
+
+          if (wifiRetryCount > 5)
+          {
+            Serial.println("Multiple WiFi failures - full reset...");
+            WiFi.disconnect(true, true);
+            wifiRetryCount = 0;
+          }
+
+          wifiReconnecting = true;
+          WiFi.begin(ssid, password);
+        }
+      }
+      else if (WiFi.status() == WL_CONNECTED)
+      {
+        if (wifiReconnecting)
+        {
+          Serial.println("WiFi reconnected!");
+          Serial.print("IP: ");
+          Serial.println(WiFi.localIP());
+        }
+        wifiRetryCount = 0;
+        wifiReconnecting = false;
+      }
+    }
+
+    // MQTT connection (only if WiFi is connected)
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      if (!mqttClient.connected())
+      {
+        reconnectMQTT();
+      }
+      else
+      {
+        mqttClient.loop();
+      }
+    }
+
+    vTaskDelay(10 / portTICK_PERIOD_MS); // Small delay to prevent watchdog
+  }
+}
+
+// ==================== MAIN LOOP (runs on Core 1 - display only) ====================
+void loop()
+{
+  // Handle audio playback
+  handleAudioLoop();
+
+  // Update display every 100ms - this loop is dedicated to display only
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate >= 100)
+  {
+    lastUpdate = millis();
+    updateDisplay();
+  }
+}
+
+// ==================== WIFI SETUP ====================
+void setupWiFi()
+{
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(ssid);
+
+  // Full WiFi reset
+  WiFi.disconnect(true, true); // Disconnect and erase saved credentials
+  delay(100);
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  delay(100);
+
+  // Enable auto-reconnect
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 40) // 20 seconds timeout
+  {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+
+    // Show connection status on display
+    if (dma_display != nullptr && attempts % 4 == 0)
+    {
+      dma_display->fillRect(0, 0, 64, 10, 0);
+      dma_display->setCursor(2, 1);
+      dma_display->setTextColor(colorYellow);
+      dma_display->print("WiFi...");
+      dma_display->print(attempts / 2);
+    }
+  }
+
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println("\nWiFi connected!");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+
+    // Show connected status
+    if (dma_display != nullptr)
+    {
+      dma_display->fillRect(0, 0, 64, 10, 0);
+      dma_display->setCursor(2, 1);
+      dma_display->setTextColor(colorGreen);
+      dma_display->print("WiFi OK!");
+    }
+  }
+  else
+  {
+    Serial.println("\nWiFi connection failed - will retry...");
+
+    // Show failed status
+    if (dma_display != nullptr)
+    {
+      dma_display->fillRect(0, 0, 64, 10, 0);
+      dma_display->setCursor(2, 1);
+      dma_display->setTextColor(colorRed);
+      dma_display->print("WiFi Fail");
+    }
+  }
+}
+
+// ==================== MQTT SETUP ====================
+void setupMQTT()
+{
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(512);
+  mqttClient.setSocketTimeout(1); // 1 second max for all socket operations
+}
+
+void reconnectMQTT()
+{
+  static unsigned long lastAttempt = 0;
+  static int mqttRetryCount = 0;
+
+  // Check WiFi first
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    return; // Silent return - don't block
+  }
+
+  // Non-blocking: only attempt every 5 seconds
+  if (millis() - lastAttempt < 5000)
+    return;
+  lastAttempt = millis();
+
+  mqttRetryCount++;
+  Serial.print("Connecting to MQTT (attempt ");
+  Serial.print(mqttRetryCount);
+  Serial.print(")...");
+
+  // Reinitialize MQTT client after multiple failures
+  if (mqttRetryCount > 5)
+  {
+    Serial.println("\nReinitializing MQTT client...");
+    mqttClient.disconnect();
+    mqttClient.setServer(mqtt_server, mqtt_port);
+    mqttClient.setCallback(mqttCallback);
+    mqttClient.setSocketTimeout(1);
+    mqttRetryCount = 0;
+  }
+
+  if (mqttClient.connect(mqtt_client_id))
+  {
+    Serial.println("connected!");
+    mqttRetryCount = 0;
+
+    // Subscribe to topics
+    mqttClient.subscribe(topic_brightness);
+    mqttClient.subscribe(topic_message);
+    mqttClient.subscribe(topic_weather);
+    mqttClient.subscribe(topic_color);
+    mqttClient.subscribe(topic_speed);
+    mqttClient.subscribe(topic_restart);
+    mqttClient.subscribe(topic_announce); // Audio announcements
+
+    // Publish status
+    mqttClient.publish(topic_status, "online");
+
+    Serial.println("Subscribed to all topics");
+  }
+  else
+  {
+    Serial.print("failed, rc=");
+    Serial.print(mqttClient.state());
+    Serial.println(" - will retry...");
+  }
+}
+
+// ==================== MQTT CALLBACK ====================
+void mqttCallback(char *topic, byte *payload, unsigned int length)
+{
+  String message;
+  for (unsigned int i = 0; i < length; i++)
+  {
+    message += (char)payload[i];
+  }
+
+  Serial.print("MQTT [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  Serial.println(message);
+
+  // Handle brightness
+  if (String(topic) == topic_brightness)
+  {
+    int brightness = message.toInt();
+    if (brightness >= 0 && brightness <= 255)
+    {
+      currentBrightness = brightness;
+      dma_display->setBrightness8(currentBrightness);
+      Serial.print("Brightness set to: ");
+      Serial.println(currentBrightness);
+    }
+  }
+
+  // Handle custom message
+  else if (String(topic) == topic_message)
+  {
+    customMessage = message;
+    Serial.print("Message set to: ");
+    Serial.println(customMessage);
+  }
+
+  // Handle weather data (JSON format)
+  else if (String(topic) == topic_weather)
+  {
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (!error)
+    {
+      weatherTemp = doc["temp"].as<String>();
+      weatherDesc = doc["desc"].as<String>();
+      weatherCity = doc["city"].as<String>();
+      Serial.print("Weather updated: ");
+      Serial.print(weatherTemp);
+      Serial.print("°C, ");
+      Serial.println(weatherDesc);
+    }
+  }
+
+  // Handle color settings (JSON format)
+  else if (String(topic) == topic_color)
+  {
+    Serial.println("=== COLOR MESSAGE RECEIVED ===");
+    Serial.print("Raw payload: ");
+    Serial.println(message);
+
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (error)
+    {
+      Serial.print("JSON parse error: ");
+      Serial.println(error.c_str());
+      return;
+    }
+
+    Serial.println("JSON parsed successfully!");
+
+    if (doc.containsKey("message"))
+    {
+      int r = doc["message"]["r"] | 0;
+      int g = doc["message"]["g"] | 255;
+      int b = doc["message"]["b"] | 0;
+      userColorMessage = dma_display->color565(r, g, b);
+      Serial.printf("Message color: R=%d, G=%d, B=%d\n", r, g, b);
+    }
+    if (doc.containsKey("time"))
+    {
+      int r = doc["time"]["r"] | 0;
+      int g = doc["time"]["g"] | 255;
+      int b = doc["time"]["b"] | 255;
+      userColorTime = dma_display->color565(r, g, b);
+      Serial.printf("Time color: R=%d, G=%d, B=%d\n", r, g, b);
+    }
+    if (doc.containsKey("weather"))
+    {
+      int r = doc["weather"]["r"] | 255;
+      int g = doc["weather"]["g"] | 165;
+      int b = doc["weather"]["b"] | 0;
+      userColorWeather = dma_display->color565(r, g, b);
+      Serial.printf("Weather color: R=%d, G=%d, B=%d\n", r, g, b);
+    }
+    if (doc.containsKey("weatherDesc"))
+    {
+      int r = doc["weatherDesc"]["r"] | 255;
+      int g = doc["weatherDesc"]["g"] | 255;
+      int b = doc["weatherDesc"]["b"] | 0;
+      userColorWeatherDesc = dma_display->color565(r, g, b);
+      Serial.printf("WeatherDesc color: R=%d, G=%d, B=%d\n", r, g, b);
+    }
+    Serial.println("Colors updated!");
+  }
+
+  // Handle scroll speed
+  else if (String(topic) == topic_speed)
+  {
+    int speed = message.toInt();
+    if (speed >= 20 && speed <= 500)
+    {
+      scrollSpeed = speed;
+      Serial.print("Scroll speed set to: ");
+      Serial.print(scrollSpeed);
+      Serial.println("ms");
+    }
+  }
+
+  // Handle restart command
+  else if (String(topic) == topic_restart)
+  {
+    Serial.print("Restart command received: ");
+    Serial.println(message);
+
+    if (message == "wifi" || message == "all")
+    {
+      Serial.println("Restarting WiFi connection...");
+
+      // Publish status before disconnect
+      mqttClient.publish(topic_status, "restarting_wifi");
+      delay(100);
+
+      // Disconnect everything
+      mqttClient.disconnect();
+      WiFi.disconnect(true, true);
+      delay(500);
+
+      // Reconnect
+      setupWiFi();
+
+      // Reconfigure NTP after WiFi reconnect
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+        setupMQTT();
+      }
+    }
+    else if (message == "mqtt")
+    {
+      Serial.println("Restarting MQTT connection...");
+      mqttClient.publish(topic_status, "restarting_mqtt");
+      delay(100);
+      mqttClient.disconnect();
+      delay(500);
+      // reconnectMQTT will be called in next loop iteration
+    }
+    else if (message == "reboot")
+    {
+      Serial.println("Rebooting ESP32...");
+      mqttClient.publish(topic_status, "rebooting");
+      delay(500);
+      ESP.restart();
+    }
+  }
+
+  // Handle announcement (audio URL from TTS server)
+  else if (String(topic) == topic_announce)
+  {
+    Serial.println("=== ANNOUNCEMENT RECEIVED ===");
+    Serial.print("Topic: ");
+    Serial.println(topic);
+    Serial.print("URL: ");
+    Serial.println(message);
+
+    // Stop any currently playing audio
+    stopAudio();
+
+    // Play the audio from URL
+    playAudioFromURL(message);
+    Serial.println("=== PLAYING ANNOUNCEMENT ===");
+  }
+}
+
+// ==================== DISPLAY UPDATE ====================
+void updateDisplay()
+{
+  dma_display->clearScreen();
+
+  drawSectionBorders();
+  drawMessageSection();
+  drawTimeSection();
+  drawWeatherSection();
+}
+
+void drawSectionBorders()
+{
+  // Draw horizontal divider lines
+  dma_display->drawLine(0, 10, 63, 10, dma_display->color565(40, 40, 40));
+  dma_display->drawLine(0, 21, 63, 21, dma_display->color565(40, 40, 40));
+}
+
+void drawMessageSection()
+{
+  // Section 1: Custom message (rows 0-9)
+  dma_display->setTextSize(1);
+  dma_display->setTextColor(userColorMessage);
+
+  // Scroll long messages
+  static int scrollPos = 0;
+  static unsigned long lastScroll = 0;
+
+  String displayMsg = customMessage;
+  int msgWidth = displayMsg.length() * 6; // Each char is ~6 pixels wide
+
+  if (msgWidth > 64)
+  {
+    // Scrolling text
+    if (millis() - lastScroll > scrollSpeed)
+    {
+      scrollPos++;
+      if (scrollPos > msgWidth)
+        scrollPos = -64;
+      lastScroll = millis();
+    }
+    dma_display->setCursor(-scrollPos, 1);
+  }
+  else
+  {
+    // Center short text
+    int x = (64 - msgWidth) / 2;
+    dma_display->setCursor(x, 1);
+  }
+
+  dma_display->print(displayMsg);
+}
+
+void drawTimeSection()
+{
+  // Section 2: Time & Date (rows 11-20)
+  struct tm timeinfo;
+
+  // Use 0ms timeout to prevent blocking - just use cached time
+  if (getLocalTime(&timeinfo, 0))
+  {
+    char timeStr[9];
+    char dateStr[12];
+
+    // Format time with seconds: HH:MM:SS
+    strftime(timeStr, sizeof(timeStr), "%H:%M:%S", &timeinfo);
+
+    // Format date: DD-MMM
+    strftime(dateStr, sizeof(dateStr), "%d-%b", &timeinfo);
+
+    // Draw time (larger, centered)
+    dma_display->setTextSize(1);
+    dma_display->setTextColor(userColorTime);
+    int timeWidth = strlen(timeStr) * 6;
+    dma_display->setCursor((64 - timeWidth) / 2, 12);
+    dma_display->print(timeStr);
+  }
+  else
+  {
+    dma_display->setTextColor(colorRed);
+    dma_display->setCursor(8, 12);
+    dma_display->print("No Time");
+  }
+}
+
+void drawWeatherSection()
+{
+  // Section 3: Weather (rows 22-31)
+  dma_display->setTextSize(1);
+  dma_display->setTextWrap(false);
+
+  // Temperature with degree symbol (left side, fixed position)
+  dma_display->setTextColor(userColorWeather);
+  String tempDisplay = weatherTemp + String((char)247) + "C"; // 247 is degree symbol in CP437
+  dma_display->setCursor(0, 23);
+  dma_display->print(tempDisplay);
+
+  // Calculate temp width to know where description starts
+  int tempWidth = tempDisplay.length() * 6 + 2; // Add small gap
+  int descStartX = tempWidth + 2;
+  int availableWidth = 64 - descStartX;
+
+  // Weather description with city name - scrolling if too long
+  static int weatherScrollPos = 0;
+  static unsigned long lastWeatherScroll = 0;
+
+  dma_display->setTextColor(userColorWeatherDesc);
+  // Combine weather description and city name
+  String desc = weatherDesc;
+  if (weatherCity.length() > 0)
+  {
+    desc += " - " + weatherCity;
+  }
+  int descWidth = desc.length() * 6;
+
+  if (descWidth > availableWidth)
+  {
+    // Scrolling weather description
+    if (millis() - lastWeatherScroll > scrollSpeed)
+    {
+      weatherScrollPos++;
+      if (weatherScrollPos > descWidth)
+        weatherScrollPos = -availableWidth;
+      lastWeatherScroll = millis();
+    }
+
+    // Draw scrolling text with clipping (only in available area)
+    for (int i = 0; i < desc.length(); i++)
+    {
+      int charX = descStartX + (i * 6) - weatherScrollPos;
+      if (charX >= descStartX - 6 && charX < 64)
+      {
+        if (charX >= descStartX)
+        {
+          dma_display->setCursor(charX, 23);
+          dma_display->print(desc.charAt(i));
+        }
+      }
+    }
+  }
+  else
+  {
+    // Fit in available space
+    dma_display->setCursor(descStartX, 23);
+    dma_display->print(desc);
+  }
+}

@@ -1,0 +1,32 @@
+# Systemd service file for HUB75 TTS Server
+# Copy to: /etc/systemd/system/hub75-tts.service
+#
+# Installation:
+#   sudo cp hub75-tts.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable hub75-tts
+#   sudo systemctl start hub75-tts
+#
+# Check status: sudo systemctl status hub75-tts
+# View logs: sudo journalctl -u hub75-tts -f
+
+[Unit]
+Description=HUB75 TTS Announcement Server
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/hub75-backend
+ExecStart=/usr/bin/python3 /home/pi/hub75-backend/tts_server.py
+Restart=always
+RestartSec=10
+
+# Performance optimizations for Pi 3B+
+Nice=5
+CPUQuota=50%
+MemoryLimit=256M
+
+[Install]
+WantedBy=multi-user.target

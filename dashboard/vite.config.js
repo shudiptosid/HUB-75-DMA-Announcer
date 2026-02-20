@@ -7,4 +7,5 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
-base: process.env.VITE_BASE_PATH || });
+  base: process.env.VITE_BASE_PATH || "HUB-75-DMA-Announce",
+});

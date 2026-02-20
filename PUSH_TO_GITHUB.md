@@ -41,6 +41,7 @@ Visit: https://github.com/shudiptosid/HUB-75-DMA-Announcer
 ## Next Steps
 
 After pushing:
+
 1. Deploy frontend to Vercel
 2. Copy backend to your Raspberry Pi
 3. Flash firmware to ESP32

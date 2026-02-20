@@ -43,6 +43,7 @@ A complete IoT solution for controlling HUB75 RGB LED Matrix displays with MQTT,
 ## 🛠️ Hardware Requirements
 
 ### Required Components
+
 - **ESP32-S3 Mini** (or any ESP32 board with enough GPIO)
 - **HUB75 64x32 RGB LED Matrix Panel**
 - **Raspberry Pi 3B+** (or any Linux server, even Pi Zero 2W works)
@@ -50,6 +51,7 @@ A complete IoT solution for controlling HUB75 RGB LED Matrix displays with MQTT,
 - **Jumper wires** for connections
 
 ### Optional (for Voice Announcements)
+
 - **MAX98357A I2S Audio Amplifier**
 - **Speaker** (4Ω-8Ω, 3W recommended)
 
@@ -66,6 +68,7 @@ npm run build
 ```
 
 **Then deploy**:
+
 1. Push to GitHub: https://github.com/shudiptosid/HUB-75-DMA-Announcer
 2. Go to [vercel.com](https://vercel.com) and import your repo
 3. Set root directory to `frontend`
@@ -96,6 +99,7 @@ python3 tts_server.py
 ### Step 3: Flash ESP32 Firmware (2 minutes)
 
 1. **Edit** `firmware/src/main.cpp`:
+
 ```cpp
 // Update these lines
 const char *ssid = "YOUR_WIFI_NAME";
@@ -104,6 +108,7 @@ const char *mqtt_server = "192.168.1.4";  // Your Pi's IP from Step 2
 ```
 
 2. **Upload firmware**:
+
 ```bash
 cd firmware
 pio run --target upload
@@ -154,35 +159,35 @@ HUB-75/
 
 ### HUB75 Display Pins (ESP32 ↔ LED Matrix)
 
-| HUB75 Pin | ESP32 GPIO | Function |
-|-----------|------------|----------|
-| R1 | GPIO 2 | Red (upper half) |
-| G1 | GPIO 3 | Green (upper half) |
-| B1 | GPIO 4 | Blue (upper half) |
-| R2 | GPIO 5 | Red (lower half) |
-| G2 | GPIO 6 | Green (lower half) |
-| B2 | GPIO 7 | Blue (lower half) |
-| A | GPIO 16 | Row select A |
-| B | GPIO 17 | Row select B |
-| C | GPIO 18 | Row select C |
-| D | GPIO 8 | Row select D |
-| E | GPIO 15 | Row select E |
-| CLK | GPIO 9 | Clock signal |
-| LAT | GPIO 10 | Latch |
-| OE | GPIO 11 | Output Enable |
-| GND | GND | Ground |
-| VCC | 5V (external) | Power (2-3A) |
+| HUB75 Pin | ESP32 GPIO    | Function           |
+| --------- | ------------- | ------------------ |
+| R1        | GPIO 2        | Red (upper half)   |
+| G1        | GPIO 3        | Green (upper half) |
+| B1        | GPIO 4        | Blue (upper half)  |
+| R2        | GPIO 5        | Red (lower half)   |
+| G2        | GPIO 6        | Green (lower half) |
+| B2        | GPIO 7        | Blue (lower half)  |
+| A         | GPIO 16       | Row select A       |
+| B         | GPIO 17       | Row select B       |
+| C         | GPIO 18       | Row select C       |
+| D         | GPIO 8        | Row select D       |
+| E         | GPIO 15       | Row select E       |
+| CLK       | GPIO 9        | Clock signal       |
+| LAT       | GPIO 10       | Latch              |
+| OE        | GPIO 11       | Output Enable      |
+| GND       | GND           | Ground             |
+| VCC       | 5V (external) | Power (2-3A)       |
 
 ### MAX98357A Audio Pins (Optional)
 
-| MAX98357A | ESP32 GPIO | Function |
-|-----------|------------|----------|
-| DIN | GPIO 40 | I2S Data |
-| BCLK | GPIO 42 | I2S Bit Clock |
-| LRC | GPIO 41 | I2S Word Select |
-| SD | GPIO 21 | Shutdown (HIGH=on) |
-| VIN | 5V | Power |
-| GND | GND | Ground |
+| MAX98357A | ESP32 GPIO | Function           |
+| --------- | ---------- | ------------------ |
+| DIN       | GPIO 40    | I2S Data           |
+| BCLK      | GPIO 42    | I2S Bit Clock      |
+| LRC       | GPIO 41    | I2S Word Select    |
+| SD        | GPIO 21    | Shutdown (HIGH=on) |
+| VIN       | 5V         | Power              |
+| GND       | GND        | Ground             |
 
 **Speaker**: Connect 4Ω-8Ω speaker to MAX98357A output terminals (+/-)
 
@@ -193,6 +198,7 @@ HUB-75/
 ### Frontend Configuration
 
 **Environment Variables** (optional, create `frontend/.env.local`):
+
 ```bash
 VITE_MQTT_BROKER=ws://192.168.1.4:9001
 VITE_DEFAULT_CITY=YourCity
@@ -201,6 +207,7 @@ VITE_DEFAULT_LONGITUDE=75.625
 ```
 
 **Vercel Deployment**:
+
 - Root directory: `frontend`
 - Build command: `npm run build`
 - Output directory: `dist`
@@ -209,6 +216,7 @@ VITE_DEFAULT_LONGITUDE=75.625
 ### Backend Configuration
 
 **Auto-start on Boot** (recommended):
+
 ```bash
 # Edit service file
 nano ~/hub75-backend/hub75-tts.service
@@ -228,6 +236,7 @@ sudo systemctl status hub75-tts
 ```
 
 **Backend Ports**:
+
 - `1883` - MQTT (ESP32 connection)
 - `9001` - WebSocket (Dashboard connection)
 - `8000` - HTTP (Audio file serving)
@@ -251,6 +260,7 @@ const long gmtOffset_sec = 19800;  // GMT+5:30 for India
 ```
 
 **PlatformIO Upload**:
+
 ```bash
 cd firmware
 pio run --target upload      # Upload firmware
@@ -258,6 +268,7 @@ pio device monitor           # View serial output (115200 baud)
 ```
 
 **Arduino IDE** (alternative):
+
 1. Install ESP32 board support
 2. Install libraries: ESP32-HUB75-MatrixPanel-I2S-DMA, PubSubClient, ArduinoJson, ESP8266Audio
 3. Select board: "ESP32-S3 Dev Module"
@@ -269,25 +280,26 @@ pio device monitor           # View serial output (115200 baud)
 
 The system uses these MQTT topics for communication:
 
-| Topic | Direction | Payload | Description |
-|-------|-----------|---------|-------------|
-| `display/brightness` | Dashboard → ESP32 | `0-255` | Set display brightness |
-| `display/message` | Dashboard → ESP32 | `"Hello"` | Set scrolling message |
-| `display/speed` | Dashboard → ESP32 | `50-500` | Scroll speed in ms |
-| `display/color` | Dashboard → ESP32 | JSON | RGB colors for sections |
-| `display/weather` | Dashboard → ESP32 | JSON | Weather data |
-| `display/restart` | Dashboard → ESP32 | `mqtt/wifi/reboot` | Restart ESP32 |
-| `display/announce/text` | Dashboard → TTS | `"Text"` | Text to speak |
-| `display/announce` | TTS → ESP32 | `http://url` | Audio file URL |
-| `display/status` | ESP32 → Dashboard | JSON | Device status |
+| Topic                   | Direction         | Payload            | Description             |
+| ----------------------- | ----------------- | ------------------ | ----------------------- |
+| `display/brightness`    | Dashboard → ESP32 | `0-255`            | Set display brightness  |
+| `display/message`       | Dashboard → ESP32 | `"Hello"`          | Set scrolling message   |
+| `display/speed`         | Dashboard → ESP32 | `50-500`           | Scroll speed in ms      |
+| `display/color`         | Dashboard → ESP32 | JSON               | RGB colors for sections |
+| `display/weather`       | Dashboard → ESP32 | JSON               | Weather data            |
+| `display/restart`       | Dashboard → ESP32 | `mqtt/wifi/reboot` | Restart ESP32           |
+| `display/announce/text` | Dashboard → TTS   | `"Text"`           | Text to speak           |
+| `display/announce`      | TTS → ESP32       | `http://url`       | Audio file URL          |
+| `display/status`        | ESP32 → Dashboard | JSON               | Device status           |
 
 **Example Color JSON**:
+
 ```json
 {
-  "message": {"r": 0, "g": 255, "b": 0},
-  "time": {"r": 0, "g": 255, "b": 255},
-  "weather": {"r": 255, "g": 165, "b": 0},
-  "weatherDesc": {"r": 255, "g": 255, "b": 0}
+  "message": { "r": 0, "g": 255, "b": 0 },
+  "time": { "r": 0, "g": 255, "b": 255 },
+  "weather": { "r": 255, "g": 165, "b": 0 },
+  "weatherDesc": { "r": 255, "g": 255, "b": 0 }
 }
 ```
 
@@ -345,6 +357,7 @@ The system uses these MQTT topics for communication:
 **Problem**: Dashboard shows "Disconnected"
 
 **Solutions**:
+
 1. Verify Pi IP is correct
 2. Check Mosquitto is running:
    ```bash
@@ -364,6 +377,7 @@ The system uses these MQTT topics for communication:
 **Problem**: Serial monitor shows "MQTT connection failed"
 
 **Solutions**:
+
 1. Verify MQTT server IP matches Pi's IP
 2. Check Mosquitto is running on Pi
 3. Test from another device:
@@ -378,6 +392,7 @@ The system uses these MQTT topics for communication:
 **Problem**: Serial shows "WiFi connection failed"
 
 **Solutions**:
+
 1. Verify SSID and password are correct
 2. Ensure 2.4GHz network (ESP32 doesn't support 5GHz)
 3. Check WiFi signal strength
@@ -389,6 +404,7 @@ The system uses these MQTT topics for communication:
 **Problem**: No sound from speaker
 
 **Solutions**:
+
 1. Check TTS server is running:
    ```bash
    sudo systemctl status hub75-tts
@@ -411,6 +427,7 @@ The system uses these MQTT topics for communication:
 **Problem**: LED matrix is dark or shows garbage
 
 **Solutions**:
+
 1. Check 5V power supply (must be 2-3A)
 2. Verify all HUB75 cable connections
 3. Check GPIO pin configuration in `main.cpp`
@@ -422,6 +439,7 @@ The system uses these MQTT topics for communication:
 **Problem**: TTS generation is slow
 
 **Solutions**:
+
 1. Verify espeak is installed (lighter than pyttsx3):
    ```bash
    which espeak
@@ -438,16 +456,19 @@ The system uses these MQTT topics for communication:
 ### View Logs
 
 **Mosquitto**:
+
 ```bash
 sudo tail -f /var/log/mosquitto/mosquitto.log
 ```
 
 **TTS Server** (if using systemd):
+
 ```bash
 sudo journalctl -u hub75-tts -f
 ```
 
 **ESP32**:
+
 ```bash
 pio device monitor --baud 115200
 ```
@@ -459,6 +480,7 @@ pio device monitor --baud 115200
 ### Firewall Configuration (Pi)
 
 If you have a firewall enabled:
+
 ```bash
 # Allow required ports
 sudo ufw allow 1883/tcp  # MQTT
@@ -474,6 +496,7 @@ sudo ufw status
 **For Production Use**:
 
 1. **Enable MQTT Authentication**:
+
 ```bash
 # Create password file
 sudo mosquitto_passwd -c /etc/mosquitto/passwd yourusername
@@ -492,6 +515,7 @@ sudo systemctl restart mosquitto
 2. **Use TLS/SSL** for MQTT (advanced)
 3. **Set up VPN** for remote access
 4. **Keep software updated**:
+
 ```bash
 sudo apt update && sudo apt upgrade
 ```
@@ -499,6 +523,7 @@ sudo apt update && sudo apt upgrade
 ### Port Forwarding (Optional)
 
 To access dashboard remotely:
+
 1. Forward ports 9001 (WebSocket) on your router to Pi
 2. Use dynamic DNS service for stable URL
 3. Consider using Tailscale or Cloudflare Tunnel (recommended over port forwarding)
@@ -508,12 +533,14 @@ To access dashboard remotely:
 ## 💾 Resource Usage (Raspberry Pi 3B+)
 
 **Expected Usage**:
+
 - **CPU**: 5-15% (idle), 30-40% (during TTS generation)
 - **RAM**: 50-100 MB total
 - **Disk**: ~50 MB installation + 10 MB for audio files (auto-cleaned)
 - **Network**: Minimal (MQTT messages are <1KB each)
 
 **Optimization Tips**:
+
 - TTS server uses espeak (lightweight, ~10 MB RAM)
 - Old audio files are auto-deleted (keeps last 10)
 - Systemd service has CPU/memory limits configured
@@ -523,6 +550,7 @@ To access dashboard remotely:
 ## 🔄 Updates & Maintenance
 
 ### Update Frontend
+
 ```bash
 cd frontend
 git pull
@@ -532,6 +560,7 @@ npm run build
 ```
 
 ### Update Backend
+
 ```bash
 ssh pi@raspberrypi.local
 cd ~/hub75-backend
@@ -540,6 +569,7 @@ sudo systemctl restart hub75-tts
 ```
 
 ### Update Firmware
+
 ```bash
 cd firmware
 git pull
@@ -552,11 +582,13 @@ pio run --target upload
 ## 📖 Additional Resources
 
 ### Libraries Used
+
 - **Frontend**: React, Vite, MQTT.js
 - **Backend**: paho-mqtt, pyttsx3 (fallback), espeak
 - **Firmware**: ESP32-HUB75-MatrixPanel-I2S-DMA, PubSubClient, ArduinoJson, ESP8266Audio
 
 ### Useful Links
+
 - [HUB75 Library](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA)
 - [Eclipse Mosquitto](https://mosquitto.org/)
 - [Vercel Documentation](https://vercel.com/docs)
@@ -569,6 +601,7 @@ pio run --target upload
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to:
+
 - 🐛 Report bugs
 - 💡 Suggest features
 - 🔧 Submit pull requests
@@ -587,6 +620,7 @@ MIT License - Free for personal and commercial use.
 ## 🙏 Acknowledgments
 
 Built with:
+
 - [ESP32-HUB75-MatrixPanel-DMA](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA) by mrfaptastic
 - [Eclipse Mosquitto](https://mosquitto.org/)
 - [React](https://react.dev/)
@@ -620,6 +654,7 @@ Built with:
 ## ✨ Features
 
 ### Dashboard Features
+
 - 🎨 Modern, responsive UI
 - 🌙 Dark mode support
 - 📱 Mobile friendly
@@ -629,6 +664,7 @@ Built with:
 - 📍 Weather with location selection
 
 ### Backend Features
+
 - 🔊 Text-to-speech announcements
 - 🚀 Optimized for Raspberry Pi 3B+
 - 🔄 Auto-reconnect
@@ -636,6 +672,7 @@ Built with:
 - 💾 Low memory footprint
 
 ### Firmware Features
+
 - 🕐 NTP-synced clock
 - 🌤️ Weather display
 - 📜 Scrolling messages
@@ -657,6 +694,7 @@ Built with:
 ```
 
 ### Communication Flow
+
 1. **User** controls display via web dashboard (Vercel)
 2. **Dashboard** sends MQTT commands via WebSocket (port 9001)
 3. **Mosquitto** broker on Pi routes messages
@@ -667,6 +705,7 @@ Built with:
 ## 🛠️ Hardware Requirements
 
 ### Required
+
 - **ESP32-S3 Mini** (or compatible ESP32 board)
 - **HUB75 64x32 RGB LED Matrix** panel
 - **Raspberry Pi 3B+** (or any Linux server, Pi Zero 2W works too)
@@ -674,35 +713,40 @@ Built with:
 - **Jumper wires** for connections
 
 ### Optional (for announcements)
+
 - **MAX98357A I2S Audio Amplifier**
 - **Speaker** (4Ω-8Ω)
 
 ## 📋 Network Ports
 
-| Service | Port | Protocol | Purpose |
-|---------|------|----------|---------|
-| Mosquitto MQTT | 1883 | TCP | ESP32 ↔ Broker |
-| Mosquitto WebSocket | 9001 | WS | Dashboard ↔ Broker |
-| TTS HTTP Server | 8000 | HTTP | ESP32 downloads audio |
+| Service             | Port | Protocol | Purpose               |
+| ------------------- | ---- | -------- | --------------------- |
+| Mosquitto MQTT      | 1883 | TCP      | ESP32 ↔ Broker        |
+| Mosquitto WebSocket | 9001 | WS       | Dashboard ↔ Broker    |
+| TTS HTTP Server     | 8000 | HTTP     | ESP32 downloads audio |
 
 ## 🐛 Troubleshooting
 
 ### Dashboard can't connect to MQTT
+
 - Verify Pi IP address
 - Check firewall: `sudo ufw allow 9001/tcp`
 - Test: `mosquitto_sub -h YOUR_PI_IP -p 9001 -t '#'`
 
 ### ESP32 can't connect to MQTT
+
 - Verify Pi IP in firmware
 - Check if Mosquitto is running: `sudo systemctl status mosquitto`
 - Check ESP32 serial monitor for errors
 
 ### Audio not working
+
 - Ensure TTS server is running: `python3 tts_server.py`
 - Check if espeak is installed: `espeak "test"`
 - Verify MAX98357A wiring
 
 ### Display issues
+
 - Check HUB75 cable connections
 - Verify 5V power supply is adequate (2-3A minimum)
 - Check GPIO pin definitions match your wiring
@@ -710,6 +754,7 @@ Built with:
 ## 🎯 Development
 
 ### Frontend
+
 ```bash
 cd frontend
 npm install
@@ -718,6 +763,7 @@ npm run build      # Production build
 ```
 
 ### Backend
+
 ```bash
 cd backend
 pip3 install -r requirements.txt
@@ -725,6 +771,7 @@ python3 tts_server.py
 ```
 
 ### Firmware
+
 ```bash
 cd firmware
 pio run              # Build
@@ -737,6 +784,7 @@ pio device monitor   # Serial monitor
 **This setup uses anonymous MQTT connections for simplicity.**
 
 For production:
+
 1. Enable MQTT authentication
 2. Use TLS/SSL for MQTT
 3. Set up firewall rules
@@ -749,6 +797,7 @@ MIT License - feel free to use this project for personal or commercial purposes.
 ## 🙏 Credits
 
 Built with:
+
 - [ESP32-HUB75-MatrixPanel-DMA](https://github.com/mrfaptastic/ESP32-HUB75-MatrixPanel-DMA)
 - [Eclipse Mosquitto](https://mosquitto.org/)
 - [React](https://react.dev/)

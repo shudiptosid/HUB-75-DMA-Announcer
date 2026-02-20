@@ -3,6 +3,7 @@
 ## 📊 Summary
 
 ### Before (11 files) ❌
+
 - README.md
 - START_HERE.md
 - DEPLOYMENT.md
@@ -17,6 +18,7 @@
 - WIRING_MAX98357A.md
 
 ### After (2 files) ✅
+
 - **README.md** (31.72 KB, 1084 lines) - Complete guide with:
   - Quick setup (3 steps)
   - Hardware requirements
@@ -63,6 +65,7 @@ git push -u origin main
 ### 2. Deploy
 
 Follow README.md for:
+
 - Vercel deployment (frontend)
 - Raspberry Pi setup (backend)
 - ESP32 firmware upload

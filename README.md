@@ -57,7 +57,7 @@ A complete IoT solution for controlling HUB75 RGB LED Matrix displays with MQTT,
 
 ---
 
-## 🚀 Quick Setup (3 Steps)
+## Quick Setup (3 Steps)
 
 ### Step 1: Deploy Frontend to Vercel (2 minutes)
 
@@ -193,7 +193,7 @@ HUB-75/
 
 ---
 
-## ⚙️ Detailed Configuration
+## Detailed Configuration
 
 ### Frontend Configuration
 

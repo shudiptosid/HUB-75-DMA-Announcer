@@ -1,4 +1,4 @@
-# 🌈 HUB75 LED Matrix Display System
+#  HUB75 LED Matrix Display System
 
 [![GitHub](https://img.shields.io/badge/GitHub-shudiptosid%2FHUB--75--DMA--Announcer-blue?style=flat&logo=github)](https://github.com/shudiptosid/HUB-75-DMA-Announcer)
 [![ESP32](https://img.shields.io/badge/ESP32--S3-Supported-green?style=flat&logo=espressif)](https://www.espressif.com/en/products/socs/esp32-s3)
@@ -10,39 +10,39 @@ A complete IoT solution for controlling HUB75 RGB LED Matrix displays with MQTT,
 
 ---
 
-## 📺 Display Layout
+##  Display Layout
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  📝 SCROLLING MESSAGE (Custom text, adjustable speed)          │
+│   SCROLLING MESSAGE (Custom text, adjustable speed)          │
 ├────────────────────────────────────────────────────────────────┤
-│  🕐 TIME & DATE (NTP synchronized, auto-updating)              │
+│   TIME & DATE (NTP synchronized, auto-updating)              │
 ├────────────────────────────────────────────────────────────────┤
-│  🌤️ WEATHER (Real-time temperature & conditions)               │
+│   WEATHER (Real-time temperature & conditions)               │
 └────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ✨ Features
+##  Features
 
-- 🎨 **Modern Web Dashboard** - Control display from anywhere via web browser
-- 🌙 **Dark Mode** - Eye-friendly interface with theme toggle
-- 🎚️ **Brightness Control** - Smooth 0-255 adjustment with quick presets
-- 📜 **Scrolling Messages** - Custom text with adjustable animation speed
-- 🔊 **Voice Announcements** - Text-to-speech with I2S audio output
-- 🕐 **Smart Clock** - NTP-synchronized time display with seconds
-- 🌤️ **Live Weather** - Real-time updates from Open-Meteo API (free, no key needed)
-- 🎨 **Color Customization** - Independent RGB control for each display section
-- 📡 **MQTT Protocol** - Reliable real-time communication
-- 🔄 **Auto-Reconnect** - Robust WiFi and MQTT recovery
-- 📱 **Mobile Responsive** - Works on desktop, tablet, and mobile
+- Modern Web Dashboard** - Control display from anywhere via web browser
+- Dark Mode - Eye-friendly interface with theme toggle
+- Brightness Control - Smooth 0-255 adjustment with quick presets
+- Scrolling Messages - Custom text with adjustable animation speed
+- Voice Announcements - Text-to-speech with I2S audio output
+- Smart Clock - NTP-synchronized time display with seconds
+- Live Weather - Real-time updates from Open-Meteo API (free, no key needed)
+- Color Customization - Independent RGB control for each display section
+- MQTT Protocol - Reliable real-time communication
+- Auto-Reconnect - Robust WiFi and MQTT recovery
+- Mobile Responsive - Works on desktop, tablet, and mobile
 
 ---
 
-## 🛠️ Hardware Requirements
+# Hardware Requirements
 
-### Required Components
+# Required Components
 
 - **ESP32-S3 Mini** (or any ESP32 board with enough GPIO)
 - **HUB75 64x32 RGB LED Matrix Panel**
@@ -121,13 +121,13 @@ pio device monitor  # View serial output
 2. Go to "Connection" section
 3. Enter: `ws://YOUR_PI_IP:9001` (e.g., `ws://192.168.1.4:9001`)
 4. Click "Reconnect"
-5. ✅ Status should show "Connected"
+5. Status should show "Connected"
 
 **Done!** Send a test message from the dashboard.
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 HUB-75/
@@ -155,7 +155,7 @@ HUB-75/
 
 ---
 
-## 🔌 Pin Configuration
+## Pin Configuration
 
 ### HUB75 Display Pins (ESP32 ↔ LED Matrix)
 
@@ -276,7 +276,7 @@ pio device monitor           # View serial output (115200 baud)
 
 ---
 
-## 📡 MQTT Topics
+## MQTT Topics
 
 The system uses these MQTT topics for communication:
 
@@ -305,7 +305,7 @@ The system uses these MQTT topics for communication:
 
 ---
 
-## 🎯 System Architecture
+## System Architecture
 
 ```
 ┌─────────────────┐
@@ -350,7 +350,7 @@ The system uses these MQTT topics for communication:
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Dashboard Connection Issues
 
@@ -475,7 +475,7 @@ pio device monitor --baud 115200
 
 ---
 
-## 🔒 Network & Security
+## Network & Security
 
 ### Firewall Configuration (Pi)
 
@@ -530,7 +530,7 @@ To access dashboard remotely:
 
 ---
 
-## 💾 Resource Usage (Raspberry Pi 3B+)
+## Resource Usage (Raspberry Pi 3B+)
 
 **Expected Usage**:
 
@@ -547,7 +547,7 @@ To access dashboard remotely:
 
 ---
 
-## 🔄 Updates & Maintenance
+## Updates & Maintenance
 
 ### Update Frontend
 
@@ -579,7 +579,7 @@ pio run --target upload
 
 ---
 
-## 📖 Additional Resources
+## Additional Resources
 
 ### Libraries Used
 
@@ -598,26 +598,26 @@ pio run --target upload
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Feel free to:
 
-- 🐛 Report bugs
-- 💡 Suggest features
-- 🔧 Submit pull requests
-- 📖 Improve documentation
+- Report bugs
+- Suggest features
+- Submit pull requests
+- Improve documentation
 
 **Repository**: https://github.com/shudiptosid/HUB-75-DMA-Announcer
 
 ---
 
-## 📄 License
+## License
 
 MIT License - Free for personal and commercial use.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built with:
 
@@ -628,60 +628,60 @@ Built with:
 
 ---
 
-## 📧 Support
+## Support
 
 - **GitHub Issues**: https://github.com/shudiptosid/HUB-75-DMA-Announcer/issues
 - **Discussions**: Check GitHub Discussions for Q&A
 
 ---
 
-**Made with ❤️ by [Shudipto Siddaqi](https://github.com/shudiptosid)**
+**Made with by [Shudipto Gain](https://github.com/shudiptosid)**
 
-**⭐ Star this repo if you find it useful!**
+** Star this repo if you find it useful!**
 
-## 📺 Display Layout
+## Display Layout
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  📝 SCROLLING MESSAGE                    (Custom, adjustable)  │
+│   SCROLLING MESSAGE                    (Custom, adjustable)  │
 ├────────────────────────────────────────────────────────────────┤
-│  🕐 TIME & DATE                         (NTP synchronized)    │
+│   TIME & DATE                         (NTP synchronized)    │
 ├────────────────────────────────────────────────────────────────┤
-│  🌤️ WEATHER                              (Real-time updates)   │
+│   WEATHER                              (Real-time updates)   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-## ✨ Features
+## Features
 
 ### Dashboard Features
 
-- 🎨 Modern, responsive UI
-- 🌙 Dark mode support
-- 📱 Mobile friendly
-- ⚡ Real-time MQTT control
-- 🎚️ Brightness & speed control
-- 🎨 Custom RGB colors
-- 📍 Weather with location selection
+- Modern, responsive UI
+- Dark mode support
+- Mobile friendly
+- Real-time MQTT control
+- Brightness & speed control
+- Custom RGB colors
+- Weather with location selection
 
 ### Backend Features
 
-- 🔊 Text-to-speech announcements
-- 🚀 Optimized for Raspberry Pi 3B+
-- 🔄 Auto-reconnect
-- 📁 Automatic audio file cleanup
-- 💾 Low memory footprint
+- Text-to-speech announcements
+- Optimized for Raspberry Pi 3B+
+-  Auto-reconnect
+- Automatic audio file cleanup
+- Low memory footprint
 
 ### Firmware Features
 
-- 🕐 NTP-synced clock
-- 🌤️ Weather display
-- 📜 Scrolling messages
-- 🔊 I2S audio playback
-- 🎨 Custom colors
-- 📡 MQTT control
-- 🔄 Remote restart
+- NTP-synced clock
+- Weather display
+- Scrolling messages
+- I2S audio playback
+- Custom colors
+- MQTT control
+- Remote restart
 
-## 🔌 System Architecture
+## System Architecture
 
 ```
 ┌─────────────┐         ┌──────────────────┐         ┌─────────────┐
@@ -702,7 +702,7 @@ Built with:
 5. **TTS Server** generates audio for announcements
 6. **ESP32** downloads and plays audio via HTTP
 
-## 🛠️ Hardware Requirements
+## Hardware Requirements
 
 ### Required
 
@@ -717,7 +717,7 @@ Built with:
 - **MAX98357A I2S Audio Amplifier**
 - **Speaker** (4Ω-8Ω)
 
-## 📋 Network Ports
+## Network Ports
 
 | Service             | Port | Protocol | Purpose               |
 | ------------------- | ---- | -------- | --------------------- |
@@ -725,7 +725,7 @@ Built with:
 | Mosquitto WebSocket | 9001 | WS       | Dashboard ↔ Broker    |
 | TTS HTTP Server     | 8000 | HTTP     | ESP32 downloads audio |
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Dashboard can't connect to MQTT
 
@@ -751,7 +751,7 @@ Built with:
 - Verify 5V power supply is adequate (2-3A minimum)
 - Check GPIO pin definitions match your wiring
 
-## 🎯 Development
+## Development
 
 ### Frontend
 
@@ -779,7 +779,7 @@ pio run -t upload    # Upload
 pio device monitor   # Serial monitor
 ```
 
-## 🔒 Security Notes
+## Security Notes
 
 **This setup uses anonymous MQTT connections for simplicity.**
 
@@ -790,11 +790,11 @@ For production:
 3. Set up firewall rules
 4. Use VPN for remote access
 
-## 📝 License
+## License
 
 MIT License - feel free to use this project for personal or commercial purposes.
 
-## 🙏 Credits
+## Credits
 
 Built with:
 
@@ -806,11 +806,11 @@ Built with:
 
 ---
 
-**Made with ❤️ for makers and tinkerers**
+**Made with for makers and tinkerers**
 
 - **Timezone Support** - Configurable GMT offset for any location
 
-### 🌤️ Weather Integration
+###  Weather Integration
 
 - **Live Weather Data** - Real-time temperature and conditions
 - **City Display** - Shows location name with weather description
@@ -823,7 +823,7 @@ Built with:
 - **Auto-Reconnection** - Robust WiFi and MQTT recovery mechanisms
 - **Remote Device Control** - Restart ESP32's MQTT, WiFi, or full reboot from dashboard
 
-### 🎨 Modern Web Dashboard
+###  Modern Web Dashboard
 
 - **Responsive Design** - Works on desktop, tablet, and mobile
 - **Real-Time Status** - Live connection indicators and device feedback
@@ -841,7 +841,7 @@ Built with:
 | **Power Supply**    | 5V 4A+ (depending on brightness)          |
 | **Connection**      | WiFi 2.4GHz                               |
 
-### 📌 Wiring Diagram
+###  Wiring Diagram
 
 ```
 ESP32-S3 Pin    HUB75 Panel
@@ -865,7 +865,7 @@ GND     ──────► GND
 
 ---
 
-## 📦 Installation
+##  Installation
 
 ### Prerequisites
 
@@ -873,14 +873,14 @@ GND     ──────► GND
 - [Node.js](https://nodejs.org/) v18+
 - [Mosquitto MQTT Broker](https://mosquitto.org/download/)
 
-### 1️⃣ Clone the Repository
+###  Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/HUB75-LED-Matrix.git
 cd HUB75-LED-Matrix
 ```
 
-### 2️⃣ Configure ESP32 Firmware
+###  Configure ESP32 Firmware
 
 Edit `src/main.cpp` and update your credentials:
 
@@ -896,7 +896,7 @@ const char *mqtt_server = "192.168.1.x";
 const long gmtOffset_sec = 19800;  // Example: GMT+5:30 for India
 ```
 
-### 3️⃣ Upload Firmware
+###  Upload Firmware
 
 ```bash
 # Using PlatformIO CLI
@@ -905,7 +905,7 @@ pio run -t upload
 # Or use PlatformIO IDE upload button
 ```
 
-### 4️⃣ Configure MQTT Broker
+###  Configure MQTT Broker
 
 Create or update `mosquitto.conf`:
 
@@ -931,7 +931,7 @@ mosquitto -c mosquitto.conf -v
 mosquitto -c /path/to/mosquitto.conf -v
 ```
 
-### 5️⃣ Run the Dashboard
+###  Run the Dashboard
 
 ```bash
 cd dashboard
@@ -941,7 +941,7 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
-### 6️⃣ Setup Announcement System (Optional)
+###  Setup Announcement System (Optional)
 
 For audio announcements with MAX98357A:
 
@@ -955,12 +955,12 @@ For audio announcements with MAX98357A:
    python tts_server.py
    ```
 
-📖 **Full Guide**: [ANNOUNCEMENT_SETUP.md](ANNOUNCEMENT_SETUP.md)  
-⚡ **Quick Start**: [ANNOUNCEMENT_QUICKSTART.md](ANNOUNCEMENT_QUICKSTART.md)
+ **Full Guide**: [ANNOUNCEMENT_SETUP.md](ANNOUNCEMENT_SETUP.md)  
+ **Quick Start**: [ANNOUNCEMENT_QUICKSTART.md](ANNOUNCEMENT_QUICKSTART.md)
 
 ---
 
-## 🎮 Usage
+## Usage
 
 ### Dashboard Overview
 
@@ -977,9 +977,9 @@ For audio announcements with MAX98357A:
 
 The dashboard includes buttons to remotely manage the ESP32:
 
-- **🔌 MQTT** - Reconnect MQTT client only
-- **📶 WiFi** - Restart WiFi + MQTT connections
-- **🔄 Reboot** - Full ESP32 hardware restart
+- MQTT** - Reconnect MQTT client only
+- WiFi** - Restart WiFi + MQTT connections
+- Reboot** - Full ESP32 hardware restart
 
 ---
 
@@ -1018,7 +1018,7 @@ The dashboard includes buttons to remotely manage the ESP32:
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 HUB75-LED-Matrix/
@@ -1041,7 +1041,7 @@ HUB75-LED-Matrix/
 
 ---
 
-## 🔌 Dependencies
+## Dependencies
 
 ### ESP32 Firmware
 
@@ -1058,7 +1058,7 @@ HUB75-LED-Matrix/
 
 ---
 
-## 🌐 Weather API
+## Weather API
 
 This project uses the **Open-Meteo API** - a free, open-source weather API that requires no API key!
 
@@ -1074,7 +1074,7 @@ const WEATHER_CONFIG = {
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -1098,7 +1098,7 @@ mosquitto_sub -h localhost -t "display/#" -v
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -1110,13 +1110,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [mrfaptastic](https://github.com/mrfaptastic) for the amazing HUB75 DMA library
 - [Eclipse Mosquitto](https://mosquitto.org/) for the reliable MQTT broker
@@ -1126,8 +1126,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ for the maker community**
+**Made with  for the maker community**
 
-⭐ Star this repo if you find it useful!
+Star this repo if you find it useful!
 
 </div>

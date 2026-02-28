@@ -955,6 +955,7 @@ function App() {
                   onChange={(e) => updateColor("message", "r", e.target.value)}
                   className="slider-r"
                 />
+                <span className="slider-val">{colors.message.r}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-g-label">G</span>
@@ -966,6 +967,7 @@ function App() {
                   onChange={(e) => updateColor("message", "g", e.target.value)}
                   className="slider-g"
                 />
+                <span className="slider-val">{colors.message.g}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-b-label">B</span>
@@ -977,6 +979,7 @@ function App() {
                   onChange={(e) => updateColor("message", "b", e.target.value)}
                   className="slider-b"
                 />
+                <span className="slider-val">{colors.message.b}</span>
               </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
@@ -1006,6 +1009,7 @@ function App() {
                   onChange={(e) => updateColor("time", "r", e.target.value)}
                   className="slider-r"
                 />
+                <span className="slider-val">{colors.time.r}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-g-label">G</span>
@@ -1017,6 +1021,7 @@ function App() {
                   onChange={(e) => updateColor("time", "g", e.target.value)}
                   className="slider-g"
                 />
+                <span className="slider-val">{colors.time.g}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-b-label">B</span>
@@ -1028,6 +1033,7 @@ function App() {
                   onChange={(e) => updateColor("time", "b", e.target.value)}
                   className="slider-b"
                 />
+                <span className="slider-val">{colors.time.b}</span>
               </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
@@ -1057,6 +1063,7 @@ function App() {
                   onChange={(e) => updateColor("weather", "r", e.target.value)}
                   className="slider-r"
                 />
+                <span className="slider-val">{colors.weather.r}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-g-label">G</span>
@@ -1068,6 +1075,7 @@ function App() {
                   onChange={(e) => updateColor("weather", "g", e.target.value)}
                   className="slider-g"
                 />
+                <span className="slider-val">{colors.weather.g}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-b-label">B</span>
@@ -1079,6 +1087,7 @@ function App() {
                   onChange={(e) => updateColor("weather", "b", e.target.value)}
                   className="slider-b"
                 />
+                <span className="slider-val">{colors.weather.b}</span>
               </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
@@ -1110,6 +1119,7 @@ function App() {
                   }
                   className="slider-r"
                 />
+                <span className="slider-val">{colors.weatherDesc.r}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-g-label">G</span>
@@ -1123,6 +1133,7 @@ function App() {
                   }
                   className="slider-g"
                 />
+                <span className="slider-val">{colors.weatherDesc.g}</span>
               </div>
               <div className="color-slider-row">
                 <span className="slider-b-label">B</span>
@@ -1136,6 +1147,7 @@ function App() {
                   }
                   className="slider-b"
                 />
+                <span className="slider-val">{colors.weatherDesc.b}</span>
               </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>

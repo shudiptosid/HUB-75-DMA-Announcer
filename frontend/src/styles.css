@@ -430,9 +430,29 @@ input[type="range"]::-webkit-slider-thumb {
   flex-shrink: 0;
 }
 
-.slider-r-label { color: #ff3b30; }
-.slider-g-label { color: #34c759; }
-.slider-b-label { color: #007aff; }
+.slider-r-label {
+  color: #ff3b30;
+}
+.slider-g-label {
+  color: #34c759;
+}
+.slider-b-label {
+  color: #007aff;
+}
+
+.slider-val {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #86868b;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .slider-val {
+  color: #aaa;
+}
 
 .color-slider-row input {
   flex: 1;

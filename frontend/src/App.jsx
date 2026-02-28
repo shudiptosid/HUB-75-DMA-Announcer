@@ -945,30 +945,39 @@ function App() {
               Message
             </div>
             <div className="color-sliders">
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.message.r}
-                onChange={(e) => updateColor("message", "r", e.target.value)}
-                className="slider-r"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.message.g}
-                onChange={(e) => updateColor("message", "g", e.target.value)}
-                className="slider-g"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.message.b}
-                onChange={(e) => updateColor("message", "b", e.target.value)}
-                className="slider-b"
-              />
+              <div className="color-slider-row">
+                <span className="slider-r-label">R</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.message.r}
+                  onChange={(e) => updateColor("message", "r", e.target.value)}
+                  className="slider-r"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-g-label">G</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.message.g}
+                  onChange={(e) => updateColor("message", "g", e.target.value)}
+                  className="slider-g"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-b-label">B</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.message.b}
+                  onChange={(e) => updateColor("message", "b", e.target.value)}
+                  className="slider-b"
+                />
+              </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
               Apply
@@ -987,30 +996,39 @@ function App() {
               Time
             </div>
             <div className="color-sliders">
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.time.r}
-                onChange={(e) => updateColor("time", "r", e.target.value)}
-                className="slider-r"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.time.g}
-                onChange={(e) => updateColor("time", "g", e.target.value)}
-                className="slider-g"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.time.b}
-                onChange={(e) => updateColor("time", "b", e.target.value)}
-                className="slider-b"
-              />
+              <div className="color-slider-row">
+                <span className="slider-r-label">R</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.time.r}
+                  onChange={(e) => updateColor("time", "r", e.target.value)}
+                  className="slider-r"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-g-label">G</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.time.g}
+                  onChange={(e) => updateColor("time", "g", e.target.value)}
+                  className="slider-g"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-b-label">B</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.time.b}
+                  onChange={(e) => updateColor("time", "b", e.target.value)}
+                  className="slider-b"
+                />
+              </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
               Apply
@@ -1029,30 +1047,39 @@ function App() {
               Temperature
             </div>
             <div className="color-sliders">
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.weather.r}
-                onChange={(e) => updateColor("weather", "r", e.target.value)}
-                className="slider-r"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.weather.g}
-                onChange={(e) => updateColor("weather", "g", e.target.value)}
-                className="slider-g"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.weather.b}
-                onChange={(e) => updateColor("weather", "b", e.target.value)}
-                className="slider-b"
-              />
+              <div className="color-slider-row">
+                <span className="slider-r-label">R</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.weather.r}
+                  onChange={(e) => updateColor("weather", "r", e.target.value)}
+                  className="slider-r"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-g-label">G</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.weather.g}
+                  onChange={(e) => updateColor("weather", "g", e.target.value)}
+                  className="slider-g"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-b-label">B</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.weather.b}
+                  onChange={(e) => updateColor("weather", "b", e.target.value)}
+                  className="slider-b"
+                />
+              </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
               Apply
@@ -1071,36 +1098,45 @@ function App() {
               Weather
             </div>
             <div className="color-sliders">
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.weatherDesc.r}
-                onChange={(e) =>
-                  updateColor("weatherDesc", "r", e.target.value)
-                }
-                className="slider-r"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.weatherDesc.g}
-                onChange={(e) =>
-                  updateColor("weatherDesc", "g", e.target.value)
-                }
-                className="slider-g"
-              />
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={colors.weatherDesc.b}
-                onChange={(e) =>
-                  updateColor("weatherDesc", "b", e.target.value)
-                }
-                className="slider-b"
-              />
+              <div className="color-slider-row">
+                <span className="slider-r-label">R</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.weatherDesc.r}
+                  onChange={(e) =>
+                    updateColor("weatherDesc", "r", e.target.value)
+                  }
+                  className="slider-r"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-g-label">G</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.weatherDesc.g}
+                  onChange={(e) =>
+                    updateColor("weatherDesc", "g", e.target.value)
+                  }
+                  className="slider-g"
+                />
+              </div>
+              <div className="color-slider-row">
+                <span className="slider-b-label">B</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="255"
+                  value={colors.weatherDesc.b}
+                  onChange={(e) =>
+                    updateColor("weatherDesc", "b", e.target.value)
+                  }
+                  className="slider-b"
+                />
+              </div>
             </div>
             <button className="apply-btn" onClick={applyColors}>
               Apply

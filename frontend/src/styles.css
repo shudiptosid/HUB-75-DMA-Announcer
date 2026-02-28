@@ -383,9 +383,9 @@ input[type="range"]::-webkit-slider-thumb {
 
 .color-section {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
   border-bottom: 1px solid #f0f0f2;
 }
 
@@ -397,7 +397,6 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 100px;
   font-size: 0.875rem;
   color: #1d1d1f;
 }
@@ -411,19 +410,38 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .color-sliders {
-  flex: 1;
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
-.color-sliders input {
+.color-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-slider-row span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.slider-r-label { color: #ff3b30; }
+.slider-g-label { color: #34c759; }
+.slider-b-label { color: #007aff; }
+
+.color-slider-row input {
   flex: 1;
-  height: 4px;
+  height: 6px;
 }
 
 /* Apply Button for Colors */
 .apply-btn {
-  padding: 6px 14px;
+  padding: 8px 14px;
   background: #007aff;
   color: #fff;
   border: none;
@@ -433,6 +451,7 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer;
   transition: background 0.15s ease;
   white-space: nowrap;
+  align-self: flex-end;
 }
 
 .apply-btn:hover {

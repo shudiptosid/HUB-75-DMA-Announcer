@@ -18,8 +18,11 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 import socketserver
 
 # ==================== CONFIGURATION ====================
-MQTT_BROKER = "localhost"  # MQTT broker address
-MQTT_PORT = 1883
+# HiveMQ Cloud Settings - sign up free at https://www.hivemq.com/mqtt-cloud-broker/
+MQTT_BROKER = "67d1da62e9774a5ab8a193df348b96a0.s1.eu.hivemq.cloud"
+MQTT_PORT = 8883               # TLS port
+MQTT_USER = "threadrepair"
+MQTT_PASS = "12110753@Lpu"
 MQTT_TOPIC_ANNOUNCE_TEXT = "display/announce/text"  # Topic to receive text
 MQTT_TOPIC_ANNOUNCE_URL = "display/announce"        # Topic to send audio URL
 
@@ -229,14 +232,16 @@ def main():
     print("\nType messages in the dashboard to hear announcements!")
     print("Press Ctrl+C to stop\n")
     
-    # Create MQTT client
-    client = mqtt.Client()
+    # Create MQTT client with TLS for HiveMQ Cloud
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.username_pw_set(MQTT_USER, MQTT_PASS)
+    client.tls_set()  # Enable TLS
     client.on_connect = on_connect
     client.on_message = on_message
     client.on_disconnect = on_disconnect
     
     try:
-        # Connect to MQTT broker
+        # Connect to HiveMQ Cloud broker
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
         
         # Start MQTT loop

@@ -2,8 +2,14 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import mqtt from "mqtt";
 
 // ==================== CONFIGURATION ====================
-// UPDATE THESE VALUES!
-const MQTT_BROKER = "ws://localhost:9001"; // WebSocket MQTT broker
+// Credentials loaded from environment variables.
+// Local dev: set in frontend/.env.local  (gitignored — safe)
+// Production: set in Vercel → Project Settings → Environment Variables
+const MQTT_BROKER =
+  import.meta.env.VITE_MQTT_BROKER ||
+  "wss://67d1da62e9774a5ab8a193df348b96a0.s1.eu.hivemq.cloud:8884/mqtt";
+const MQTT_USER = import.meta.env.VITE_MQTT_USER || "";
+const MQTT_PASS = import.meta.env.VITE_MQTT_PASS || "";
 
 // Location for weather (Open-Meteo API - FREE, no API key needed!)
 // Find your coordinates: https://www.latlong.net/
@@ -146,6 +152,8 @@ function App() {
         connectTimeout: 10000,
         keepalive: 60,
         resubscribe: false,
+        username: MQTT_USER,
+        password: MQTT_PASS,
       });
 
       mqttClientRef.current = client;

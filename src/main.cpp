@@ -17,6 +17,7 @@
  */
 
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
@@ -32,9 +33,12 @@
 const char *ssid = "Thread_Repair 4G";
 const char *password = "Kuldip@123";
 
-// MQTT Settings - UPDATE BROKER IP!
-const char *mqtt_server = "192.168.1.4"; // Your PC's IP address
-const int mqtt_port = 1883;
+// MQTT Settings - HiveMQ Cloud
+// Sign up free at: https://www.hivemq.com/mqtt-cloud-broker/
+const char *mqtt_server = "67d1da62e9774a5ab8a193df348b96a0.s1.eu.hivemq.cloud";
+const int mqtt_port = 8883; // TLS port
+const char *mqtt_user = "threadrepair";
+const char *mqtt_pass = "12110753@Lpu";
 const char *mqtt_client_id = "ESP32_HUB75_Display";
 
 // MQTT Topics
@@ -81,7 +85,7 @@ const int daylightOffset_sec = 0;
 
 // ==================== GLOBAL OBJECTS ====================
 MatrixPanel_I2S_DMA *dma_display = nullptr;
-WiFiClient espClient;
+WiFiClientSecure espClient; // TLS client for HiveMQ Cloud
 PubSubClient mqttClient(espClient);
 
 // Audio objects
@@ -583,10 +587,12 @@ void setupWiFi()
 // ==================== MQTT SETUP ====================
 void setupMQTT()
 {
+  espClient.setInsecure(); // Skip certificate validation (simple setup)
+                           // For production, use espClient.setCACert(root_ca) instead
   mqttClient.setServer(mqtt_server, mqtt_port);
   mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(512);
-  mqttClient.setSocketTimeout(1); // 1 second max for all socket operations
+  mqttClient.setSocketTimeout(15); // HiveMQ TLS needs more time than local
 }
 
 void reconnectMQTT()
@@ -615,13 +621,14 @@ void reconnectMQTT()
   {
     Serial.println("\nReinitializing MQTT client...");
     mqttClient.disconnect();
+    espClient.setInsecure();
     mqttClient.setServer(mqtt_server, mqtt_port);
     mqttClient.setCallback(mqttCallback);
-    mqttClient.setSocketTimeout(1);
+    mqttClient.setSocketTimeout(15);
     mqttRetryCount = 0;
   }
 
-  if (mqttClient.connect(mqtt_client_id))
+  if (mqttClient.connect(mqtt_client_id, mqtt_user, mqtt_pass))
   {
     Serial.println("connected!");
     mqttRetryCount = 0;

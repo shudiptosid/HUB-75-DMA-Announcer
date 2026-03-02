@@ -18,15 +18,15 @@
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <time.h>
 #include <WebServer.h>
-#include "AudioFileSourceHTTPStream.h"
-#include "AudioFileSourceBuffer.h"
 #include "AudioGeneratorWAV.h"
 #include "AudioOutputI2S.h"
+#include "AudioFileSource.h"
 
 // ==================== CONFIGURATION ====================
 // WiFi Settings - UPDATE THESE!
@@ -51,10 +51,20 @@ const char *topic_speed = "display/speed";
 const char *topic_restart = "display/restart";
 const char *topic_announce = "display/announce"; // Audio announcement
 
-// NTP Settings
-const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 19800; // GMT+5:30 for India (adjust for your timezone)
+// NTP Settings — 3 servers for reliability (India-optimized)
+const char *ntpServer = "time.google.com"; // fastest globally
+const char *ntpServer2 = "time.cloudflare.com";
+const char *ntpServer3 = "0.in.pool.ntp.org"; // India regional
+const long gmtOffset_sec = 19800;             // GMT+5:30 for India
 const int daylightOffset_sec = 0;
+
+// ==================== WEATHER CONFIG (fetched directly by ESP32) ====================
+// Open-Meteo — FREE, no API key, no dashboard needed
+const float WEATHER_LAT = 31.375;
+const float WEATHER_LON = 75.625;
+const char *WEATHER_CITY = "Jalandhar";
+// Fetch every 15 minutes; first fetch immediately after WiFi connects
+#define WEATHER_FETCH_INTERVAL_MS (15UL * 60UL * 1000UL)
 
 // ==================== PIN CONFIGURATION ====================
 #define R1_PIN 2
@@ -90,11 +100,22 @@ PubSubClient mqttClient(espClient);
 
 // Audio objects
 AudioGeneratorWAV *wav = nullptr;
-AudioFileSourceHTTPStream *audioSource = nullptr;
-AudioFileSourceBuffer *audioBuff = nullptr;
+AudioFileSource *audioSource = nullptr; // AudioFileSourceMemory at runtime
 AudioOutputI2S *audioOut = nullptr;
 WebServer httpServer(80);
 bool isPlaying = false;
+
+// Pending audio playback (set from Core 0 MQTT callback, consumed on Core 1 loop)
+volatile bool pendingAudioPlay = false;
+String pendingAudioURL = "";
+portMUX_TYPE audioMux = portMUX_INITIALIZER_UNLOCKED;
+
+// Download handoff: Core 0 fills buffer, Core 1 starts playback from it.
+// This keeps the blocking HTTP download OFF Core 1 so display never freezes.
+volatile bool audioReady = false;    // Core 0 sets → Core 1 reads
+uint8_t *downloadedWavBuf = nullptr; // heap buffer, owned by AudioFileSourceMemory after handoff
+size_t downloadedWavLen = 0;
+portMUX_TYPE downloadMux = portMUX_INITIALIZER_UNLOCKED;
 
 // ==================== DISPLAY STATE ====================
 uint8_t currentBrightness = 90;
@@ -225,6 +246,59 @@ void setupAudio()
   Serial.println("Audio initialized on I2S port 0!");
 }
 
+// ---------------------------------------------------------------------------
+// In-memory audio source — download WAV fully from HTTP then play from heap.
+// Eliminates real-time HTTP-streaming jitter that caused truncated audio.
+// ---------------------------------------------------------------------------
+class AudioFileSourceMemory : public AudioFileSource
+{
+public:
+  AudioFileSourceMemory(uint8_t *buf, size_t len)
+      : _buf(buf), _len(len), _pos(0) {}
+  virtual ~AudioFileSourceMemory()
+  {
+    if (_buf)
+    {
+      free(_buf);
+      _buf = nullptr;
+    }
+  }
+  virtual uint32_t read(void *data, uint32_t len) override
+  {
+    uint32_t avail = (uint32_t)(_len - _pos);
+    uint32_t toRead = (len < avail) ? len : avail;
+    if (toRead == 0)
+      return 0;
+    memcpy(data, _buf + _pos, toRead);
+    _pos += toRead;
+    return toRead;
+  }
+  virtual bool seek(int32_t pos, int dir) override
+  {
+    int32_t np;
+    if (dir == SEEK_SET)
+      np = pos;
+    else if (dir == SEEK_CUR)
+      np = (int32_t)_pos + pos;
+    else
+      np = (int32_t)_len + pos;
+    if (np < 0)
+      np = 0;
+    if (np > (int32_t)_len)
+      np = (int32_t)_len;
+    _pos = (size_t)np;
+    return true;
+  }
+  virtual bool close() override { return true; }
+  virtual bool isOpen() override { return _buf != nullptr; }
+  virtual uint32_t getSize() override { return (uint32_t)_len; }
+  virtual uint32_t getPos() override { return (uint32_t)_pos; }
+
+private:
+  uint8_t *_buf;
+  size_t _len, _pos;
+};
+
 void stopAudio()
 {
   if (wav != nullptr && wav->isRunning())
@@ -232,97 +306,153 @@ void stopAudio()
     wav->stop();
     Serial.println("Audio stopped");
   }
-
-  if (audioBuff != nullptr)
-  {
-    delete audioBuff;
-    audioBuff = nullptr;
-  }
-
+  // Deleting AudioFileSourceMemory also frees the heap WAV buffer
   if (audioSource != nullptr)
   {
     delete audioSource;
     audioSource = nullptr;
   }
-
   if (wav != nullptr)
   {
     delete wav;
     wav = nullptr;
   }
-
   isPlaying = false;
 }
 
-void playAudioFromURL(String url)
+// ---------------------------------------------------------------------------
+// downloadAudioToRAM()  — runs on Core 0 (networkTask)
+// Does the blocking HTTP GET and stores the WAV in a heap buffer.
+// Sets audioReady=true when done so Core 1 can start playback.
+// Core 1 NEVER calls this, so display updates are never blocked.
+// ---------------------------------------------------------------------------
+void downloadAudioToRAM(String url)
 {
-  Serial.println("=== AUDIO PLAYBACK START ===");
-  Serial.print("Playing audio from: ");
+  Serial.println("=== AUDIO DOWNLOAD (Core 0) ===");
   Serial.println(url);
 
-  // Ensure SD pin is HIGH
-  digitalWrite(I2S_SD, HIGH);
-  Serial.println("Amplifier SD pin: HIGH");
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(8000);
+  int httpCode = http.GET();
 
-  // Show announcement on display
-  dma_display->fillRect(0, 0, 64, 10, 0);
-  dma_display->setCursor(2, 1);
-  dma_display->setTextColor(colorYellow);
-  dma_display->print("Speaker");
+  if (httpCode != HTTP_CODE_OK)
+  {
+    Serial.printf("\u2717 HTTP GET failed: %d\n", httpCode);
+    http.end();
+    return;
+  }
 
-  Serial.println("Creating audio source...");
-  // Create new audio source
-  audioSource = new AudioFileSourceHTTPStream(url.c_str());
+  int contentLength = http.getSize();
+  Serial.printf("WAV size: %d bytes\n", contentLength);
+
+  if (contentLength <= 44 || contentLength > 300000)
+  {
+    Serial.println("\u2717 Bad content length");
+    http.end();
+    return;
+  }
+
+  uint8_t *buf = (uint8_t *)malloc(contentLength);
+  if (!buf)
+  {
+    Serial.printf("\u2717 malloc failed (%d bytes)\n", contentLength);
+    http.end();
+    return;
+  }
+
+  WiFiClient *stream = http.getStreamPtr();
+  size_t bytesRead = 0;
+  unsigned long dlStart = millis();
+  while (bytesRead < (size_t)contentLength && millis() - dlStart < 8000)
+  {
+    int avail = stream->available();
+    if (avail > 0)
+    {
+      int chunk = stream->read(buf + bytesRead, contentLength - bytesRead);
+      if (chunk > 0)
+        bytesRead += chunk;
+    }
+    vTaskDelay(1 / portTICK_PERIOD_MS); // yield to RTOS while downloading
+  }
+  http.end();
+
+  if (bytesRead != (size_t)contentLength)
+  {
+    Serial.printf("\u2717 Download incomplete %u/%d\n", bytesRead, contentLength);
+    free(buf);
+    return;
+  }
+
+  Serial.printf("\u2713 Downloaded %u bytes in %lums — signalling Core 1\n",
+                bytesRead, millis() - dlStart);
+
+  // Hand off to Core 1 — protected write
+  portENTER_CRITICAL(&downloadMux);
+  // Free any previous buffer that wasn't consumed (edge case)
+  if (downloadedWavBuf != nullptr)
+  {
+    free(downloadedWavBuf);
+  }
+  downloadedWavBuf = buf;
+  downloadedWavLen = bytesRead;
+  audioReady = true;
+  portEXIT_CRITICAL(&downloadMux);
+}
+
+// ---------------------------------------------------------------------------
+// startPlaybackFromRAM()  — runs on Core 1 (loop)
+// Picks up the pre-downloaded buffer and starts WAV decoding from heap.
+// Takes microseconds — never blocks display.
+// ---------------------------------------------------------------------------
+void startPlaybackFromRAM()
+{
+  // Claim the buffer under lock
+  uint8_t *buf = nullptr;
+  size_t len = 0;
+  portENTER_CRITICAL(&downloadMux);
+  buf = downloadedWavBuf;
+  len = downloadedWavLen;
+  downloadedWavBuf = nullptr;
+  downloadedWavLen = 0;
+  audioReady = false;
+  portEXIT_CRITICAL(&downloadMux);
+
+  if (!buf || len == 0)
+    return;
+
+  stopAudio(); // clean up any previous session
+
+  digitalWrite(I2S_SD, HIGH); // ensure amplifier is on
+
+  // AudioFileSourceMemory takes ownership of buf and will free() it on delete
+  audioSource = new AudioFileSourceMemory(buf, len);
   if (!audioSource)
   {
-    Serial.println("✗ Failed to create audio source!");
+    free(buf);
     return;
   }
-  Serial.println("✓ Audio source created");
 
-  Serial.println("Creating buffer...");
-  // Create buffer
-  audioBuff = new AudioFileSourceBuffer(audioSource, 2048);
-  if (!audioBuff)
-  {
-    Serial.println("✗ Failed to create buffer!");
-    delete audioSource;
-    audioSource = nullptr;
-    return;
-  }
-  Serial.println("✓ Buffer created");
-
-  Serial.println("Creating WAV decoder...");
-  // Create WAV decoder
   wav = new AudioGeneratorWAV();
   if (!wav)
   {
-    Serial.println("✗ Failed to create WAV decoder!");
-    delete audioBuff;
     delete audioSource;
-    audioBuff = nullptr;
     audioSource = nullptr;
     return;
   }
-  Serial.println("✓ WAV decoder created");
 
-  Serial.println("Starting WAV playback...");
-  // Start playback
-  if (!wav->begin(audioBuff, audioOut))
+  if (!wav->begin(audioSource, audioOut))
   {
-    Serial.println("✗ Failed to start WAV playback!");
+    Serial.println("\u2717 Failed to begin WAV");
     delete wav;
-    delete audioBuff;
-    delete audioSource;
     wav = nullptr;
-    audioBuff = nullptr;
+    delete audioSource;
     audioSource = nullptr;
     return;
   }
-  Serial.println("✓ WAV playback started!");
 
   isPlaying = true;
-  Serial.println("Audio playback started!");
+  Serial.println("\u2713 WAV playback started from RAM!");
 }
 
 void handleAudioLoop()
@@ -410,8 +540,30 @@ void setup()
   // Connect to WiFi
   setupWiFi();
 
-  // Configure NTP
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  // Configure NTP and wait for first sync (up to 10 seconds)
+  // 3 servers in priority order — much faster than single pool.ntp.org
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, ntpServer2, ntpServer3);
+  Serial.print("Waiting for NTP sync");
+
+  // Show waiting status on display
+  dma_display->fillRect(0, 0, 64, 10, 0);
+  dma_display->setCursor(2, 1);
+  dma_display->setTextColor(colorYellow);
+  dma_display->print("NTP...");
+
+  struct tm ntpCheck;
+  int ntpAttempts = 0;
+  while (!getLocalTime(&ntpCheck, 1000) && ntpAttempts < 10)
+  {
+    Serial.print(".");
+    ntpAttempts++;
+  }
+
+  if (ntpAttempts < 10)
+    Serial.println(" synced!");
+  else
+    Serial.println(" timeout (will retry via network task)");
+
   Serial.println("NTP configured");
 
   // Setup MQTT
@@ -424,7 +576,7 @@ void setup()
   xTaskCreatePinnedToCore(
       networkTask,        // Task function
       "NetworkTask",      // Task name
-      8192,               // Stack size
+      12288,              // Stack size — larger to fit HTTPClient during audio download
       NULL,               // Parameters
       1,                  // Priority
       &networkTaskHandle, // Task handle
@@ -435,12 +587,102 @@ void setup()
 }
 
 // ==================== NETWORK TASK (runs on Core 0) ====================
+
+// WMO weather code → short description
+static const char *wmoDesc(int code)
+{
+  if (code == 0)
+    return "Clear";
+  if (code <= 2)
+    return "Partly Cloudy";
+  if (code == 3)
+    return "Cloudy";
+  if (code <= 48)
+    return "Foggy";
+  if (code <= 55)
+    return "Drizzle";
+  if (code <= 65)
+    return "Rain";
+  if (code <= 75)
+    return "Snow";
+  if (code <= 82)
+    return "Showers";
+  if (code <= 86)
+    return "Snow Shower";
+  if (code <= 99)
+    return "Thunderstorm";
+  return "Unknown";
+}
+
+// Fetch weather directly from Open-Meteo and update global variables.
+// Called from Core 0 only — blocking HTTP is safe here.
+void fetchWeatherDirect()
+{
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  char url[220];
+  snprintf(url, sizeof(url),
+           "http://api.open-meteo.com/v1/forecast"
+           "?latitude=%.4f&longitude=%.4f"
+           "&current_weather=true&timezone=Asia%%2FKolkata",
+           WEATHER_LAT, WEATHER_LON);
+
+  Serial.println("[Weather] Fetching from Open-Meteo...");
+
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(8000);
+  int code = http.GET();
+
+  if (code != HTTP_CODE_OK)
+  {
+    Serial.printf("[Weather] HTTP error: %d\n", code);
+    http.end();
+    return;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  // Parse JSON
+  StaticJsonDocument<512> doc;
+  DeserializationError err = deserializeJson(doc, payload);
+  if (err)
+  {
+    Serial.printf("[Weather] JSON error: %s\n", err.c_str());
+    return;
+  }
+
+  float temp = doc["current_weather"]["temperature"] | -999.0f;
+  int wmoCode = doc["current_weather"]["weathercode"] | 0;
+
+  if (temp == -999.0f)
+  {
+    Serial.println("[Weather] No temperature in response");
+    return;
+  }
+
+  weatherTemp = String((int)round(temp));
+  weatherDesc = String(wmoDesc(wmoCode));
+  weatherCity = String(WEATHER_CITY);
+
+  Serial.printf("[Weather] %s\u00b0C %s\n", weatherTemp.c_str(), weatherDesc.c_str());
+}
+
 void networkTask(void *parameter)
 {
   unsigned long lastWiFiCheck = 0;
   unsigned long lastWiFiRetry = 0;
   int wifiRetryCount = 0;
   bool wifiReconnecting = false;
+
+  // Weather: fetch immediately on first WiFi connect, then every 15 min
+  unsigned long lastWeatherFetch = 0;
+  bool firstWeatherFetch = true;
+
+  // NTP: re-sync check every 60 s
+  unsigned long lastNtpSync = 0;
 
   for (;;) // Infinite loop
   {
@@ -484,7 +726,29 @@ void networkTask(void *parameter)
       }
     }
 
-    // MQTT connection (only if WiFi is connected)
+    // ----- NTP: retry every 60 s until synced, then re-sync every 60 s -----
+    if (WiFi.status() == WL_CONNECTED && millis() - lastNtpSync >= 60000)
+    {
+      lastNtpSync = millis();
+      struct tm ntpRetry;
+      if (!getLocalTime(&ntpRetry, 0))
+      {
+        Serial.println("[NTP] Not synced — retrying...");
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, ntpServer2, ntpServer3);
+      }
+    }
+
+    // ----- Weather: immediate on first connect, then every 15 minutes -----
+    bool weatherDue = firstWeatherFetch ||
+                      (millis() - lastWeatherFetch >= WEATHER_FETCH_INTERVAL_MS);
+    if (WiFi.status() == WL_CONNECTED && weatherDue)
+    {
+      firstWeatherFetch = false;
+      lastWeatherFetch = millis();
+      fetchWeatherDirect();
+    }
+
+    // ----- MQTT -----
     if (WiFi.status() == WL_CONNECTED)
     {
       if (!mqttClient.connected())
@@ -497,6 +761,20 @@ void networkTask(void *parameter)
       }
     }
 
+    // ----- Audio download -----
+    if (pendingAudioPlay)
+    {
+      String urlToDownload;
+      portENTER_CRITICAL(&audioMux);
+      urlToDownload = pendingAudioURL;
+      pendingAudioPlay = false;
+      pendingAudioURL = "";
+      portEXIT_CRITICAL(&audioMux);
+
+      if (urlToDownload.length() > 0)
+        downloadAudioToRAM(urlToDownload); // fills downloadedWavBuf, sets audioReady
+    }
+
     vTaskDelay(10 / portTICK_PERIOD_MS); // Small delay to prevent watchdog
   }
 }
@@ -504,10 +782,18 @@ void networkTask(void *parameter)
 // ==================== MAIN LOOP (runs on Core 1 - display only) ====================
 void loop()
 {
-  // Handle audio playback
+  // If Core 0 finished downloading a WAV, start playback from RAM.
+  // startPlaybackFromRAM() takes microseconds — no blocking here.
+  if (audioReady)
+  {
+    startPlaybackFromRAM();
+    Serial.println("=== PLAYING ANNOUNCEMENT ===");
+  }
+
+  // Drive WAV decoder — reads from RAM so completes in microseconds.
   handleAudioLoop();
 
-  // Update display every 100ms - this loop is dedicated to display only
+  // Display always updates every 100ms — time, weather, message never freeze.
   static unsigned long lastUpdate = 0;
   if (millis() - lastUpdate >= 100)
   {
@@ -831,12 +1117,15 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
     Serial.print("URL: ");
     Serial.println(message);
 
-    // Stop any currently playing audio
-    stopAudio();
+    // DO NOT call playAudioFromURL() here! This callback runs on Core 0 (networkTask).
+    // Audio must be started on Core 1 (loop) to avoid I2S cross-core conflicts.
+    // Set a pending flag that loop() will pick up safely.
+    portENTER_CRITICAL(&audioMux);
+    pendingAudioURL = message;
+    pendingAudioPlay = true;
+    portEXIT_CRITICAL(&audioMux);
 
-    // Play the audio from URL
-    playAudioFromURL(message);
-    Serial.println("=== PLAYING ANNOUNCEMENT ===");
+    Serial.println("=== ANNOUNCEMENT QUEUED FOR PLAYBACK ===");
   }
 }
 
